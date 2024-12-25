@@ -16,11 +16,11 @@ from .service import (
     stop_animation,
 )
 
-_LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.SWITCH, Platform.SENSOR]
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+PLATFORMS: list = [Platform.SWITCH, Platform.SENSOR]
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
     hass.services.async_register(DOMAIN, "start_animation", start_animation)
     hass.services.async_register(DOMAIN, "stop_animation", stop_animation)
     hass.services.async_register(DOMAIN, "remove_lights", remove_lights)
@@ -43,7 +43,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    _LOGGER.info(f"Unloading: {entry.data}")
+    _LOGGER.info("Unloading: %s", entry.data)
     unload_ok = False
     if entry.data.get(CONF_ENTITY_TYPE, None) == ENTITY_SCENE:
         unload_ok = await hass.config_entries.async_unload_platforms(

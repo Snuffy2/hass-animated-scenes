@@ -44,7 +44,7 @@ from .const import (
     INTEGRATION_NAME,
 )
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 PLATFORM_SCHEMA_PART = vol.Schema(
     {
@@ -58,13 +58,14 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA_PART.extend(START_SERVICE_CONFIG)
 async def async_setup_platform(
     hass: HomeAssistant,
     config: ConfigType,
-    async_add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType | None = None,
+    _: AddEntitiesCallback,
+    __: DiscoveryInfoType | None = None,
 ) -> None:
 
     _LOGGER.debug(
-        f"[async_setup_platform] config name: {config.get(CONF_NAME, None)}, "
-        f"existing scenes title list: {[x.title for x in hass.config_entries.async_entries(DOMAIN)]}"
+        "[async_setup_platform] config name: %s, existing scenes title list: %s",
+        config.get(CONF_NAME, None),
+        [x.title for x in hass.config_entries.async_entries(DOMAIN)],
     )
     async_create_issue(
         hass,
@@ -110,7 +111,7 @@ class AnimatedSceneSwitch(SwitchEntity):
     _unrecorded_attributes = frozenset({MATCH_ALL})
 
     def __init__(self, hass: HomeAssistant, config: ConfigType, unique_id: str) -> None:
-        _LOGGER.debug(f"[AnimatedSceneSwitch init] config: {config}")
+        _LOGGER.debug("[AnimatedSceneSwitch init] config: %s", config)
         # _LOGGER.debug(f"[AnimatedSceneSwitch init] unique_id: {unique_id}")
         self.hass = hass
         self._config = config
@@ -160,11 +161,11 @@ class AnimatedSceneSwitch(SwitchEntity):
             CONF_COLORS: self._config.get(CONF_COLORS),
         }
 
-    async def async_turn_on(self, **kwargs: vol.Any) -> None:
+    async def async_turn_on(self, **_) -> None:
         if not self._attr_is_on:
             self._attr_is_on = True
             await Animations.instance.start(self._animation_config)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **_) -> None:
         self._attr_is_on = False
         await Animations.instance.stop({"name": self._attr_name})

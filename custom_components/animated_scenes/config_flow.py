@@ -1,10 +1,10 @@
 import copy
 import logging
 from numbers import Number
-from typing import Any
+from typing import Any, MutableMapping
 
+import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -12,9 +12,8 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.const import CONF_BRIGHTNESS, CONF_ICON, CONF_LIGHTS, CONF_NAME
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.helpers import selector
-import homeassistant.helpers.config_validation as cv
 from homeassistant.util import uuid
 
 from .const import (
@@ -87,137 +86,138 @@ COLOR_SELECTOR_OPTION_LIST = [
 ]
 
 
-def _if_list_or_int_to_str(input: Any) -> Any:
-    # _LOGGER.debug(f"[if_list_or_int_to_str] starting input: {input}, type: {type(input)}")
-    if isinstance(input, list):
-        strlist = "[" + ", ".join(str(n) for n in input) + "]"
-        # _LOGGER.debug(f"[if_list_or_int_to_str] input: {input}, strlist: {strlist}")
+def _if_list_or_int_to_str(invar: Any) -> Any:
+    # _LOGGER.debug(f"[if_list_or_int_to_str] starting input: {invar}, type: {type(invar)}")
+    if isinstance(invar, list):
+        strlist = "[" + ", ".join(str(n) for n in invar) + "]"
+        # _LOGGER.debug(f"[if_list_or_int_to_str] input: {invar}, strlist: {strlist}")
         return strlist
-    is_int_check, is_int_value = _is_int(input)
+    is_int_check, is_int_value = _is_int(invar)
     if is_int_check:
-        # _LOGGER.debug(f"[if_list_or_int_to_str] input: {input}, strint: {str(is_int_value)}")
+        # _LOGGER.debug(f"[if_list_or_int_to_str] input: {invar}, strint: {str(is_int_value)}")
         return str(is_int_value)
-    # _LOGGER.debug(f"[if_list_or_int_to_str] input: {input}, type: {type(input)}")
-    return input
+    # _LOGGER.debug(f"[if_list_or_int_to_str] input: {invar}, type: {type(invar)}")
+    return invar
 
 
-def _strlist_to_list(input: str) -> list[str, Any]:
-    return input.strip("][").split(",")
+def _strlist_to_list(invar: str) -> list[str, Any]:
+    return invar.strip("][").split(",")
 
 
-def _is_int(input: Any) -> tuple[bool, Any]:
-    # _LOGGER.debug(f"[is_int] starting input: {input}, type: {type(input)}")
-    if input is None or not isinstance(input, (Number, str)):
-        return False, input
+def _is_int(invar: Any) -> tuple[bool, Any]:
+    # _LOGGER.debug(f"[is_int] starting input: {invar}, type: {type(invar)}")
+    if invar is None or not isinstance(invar, (Number, str)):
+        return False, invar
     try:
-        float(input)
+        float(invar)
     except ValueError:
-        return False, input
-    if float(input).is_integer():
-        return True, int(input)
-    return True, round(input)
+        return False, invar
+    if float(invar).is_integer():
+        return True, int(invar)
+    return True, round(invar)
 
 
-def _is_int_or_list(input: Any, min: int = None, max: int = None) -> tuple[bool, Any]:
-    # _LOGGER.debug(f"[is_int_or_list] starting input: {input}, type: {type(input)}")
-    if input is None:
-        # _LOGGER.debug(f"[is_int_or_list] input is None: {input} (True)")
-        return True, input
-    is_int_check, is_int_value = _is_int(input)
+def _is_int_or_list(
+    invar: Any, minvar: int = None, maxvar: int = None
+) -> tuple[bool, Any]:
+    # _LOGGER.debug(f"[is_int_or_list] starting input: {invar}, type: {type(invar)}")
+    if invar is None:
+        # _LOGGER.debug(f"[is_int_or_list] input is None: {invar} (True)")
+        return True, invar
+    is_int_check, is_int_value = _is_int(invar)
     if is_int_check:
-        if (min is None or is_int_value >= min) and (
-            max is None or is_int_value <= max
+        if (minvar is None or is_int_value >= minvar) and (
+            maxvar is None or is_int_value <= maxvar
         ):
-            # _LOGGER.debug(f"[is_int_or_list] input is int in range: {input} [{min}, {max}] (True)")
+            # _LOGGER.debug(f"[is_int_or_list] input is int in range: {invar} [{minvar}, {maxvar}] (True)")
             return True, is_int_value
-        # _LOGGER.debug(f"[is_int_or_list] input is int but NOT in range: {input} [{min}, {max}] (False)")
-        return False, input
-    elif isinstance(input, str):
-        input = input.strip()
-        if input.startswith("[") and input.endswith("]") and input.count(",") == 1:
-            # _LOGGER.debug(f"[is_int_or_list] input is a 2 item string list, converting to list: {input}")
-            input = _strlist_to_list(input)
+        # _LOGGER.debug(f"[is_int_or_list] input is int but NOT in range: {invar} [{minvar}, {maxvar}] (False)")
+        return False, invar
+    elif isinstance(invar, str):
+        invar = invar.strip()
+        if invar.startswith("[") and invar.endswith("]") and invar.count(",") == 1:
+            # _LOGGER.debug(f"[is_int_or_list] input is a 2 item string list, converting to list: {invar}")
+            invar = _strlist_to_list(invar)
         else:
-            # _LOGGER.debug(f"[is_int_or_list] input is a string but is not a 2 item list: {input} (False)")
-            return False, input
+            # _LOGGER.debug(f"[is_int_or_list] input is a string but is not a 2 item list: {invar} (False)")
+            return False, invar
 
-    if isinstance(input, list):
-        if len(input) == 2:
-            is_int0_check, is_int0_value = _is_int(input[0])
-            is_int1_check, is_int1_value = _is_int(input[1])
+    if isinstance(invar, list):
+        if len(invar) == 2:
+            is_int0_check, is_int0_value = _is_int(invar[0])
+            is_int1_check, is_int1_value = _is_int(invar[1])
             if not (is_int0_check and is_int1_check):
-                # _LOGGER.debug(f"[is_int_or_list] input is a 2 item list, but 2 items aren't integers: {input} (False)")
-                return False, input
+                # _LOGGER.debug(f"[is_int_or_list] input is a 2 item list, but 2 items aren't integers: {invar} (False)")
+                return False, invar
             if is_int0_value > is_int1_value:
-                input = [is_int1_value, is_int0_value]
+                invar = [is_int1_value, is_int0_value]
             else:
-                input = [is_int0_value, is_int1_value]
-            if (min is None or (input[0] >= min and input[1] >= min)) and (
-                max is None or (input[0] <= max and input[1] <= max)
+                invar = [is_int0_value, is_int1_value]
+            if (minvar is None or (invar[0] >= minvar and invar[1] >= minvar)) and (
+                maxvar is None or (invar[0] <= maxvar and invar[1] <= maxvar)
             ):
-                if input[0] == input[1]:
-                    # _LOGGER.debug(f"[is_int_or_list] input is int in range: {input} [{min}, {max}] (True)")
-                    return True, input[0]
-                # _LOGGER.debug(f"[is_int_or_list] input is a 2 int list within min, max: {input} [{min}, {max}] (True)")
-                return True, input
-            # _LOGGER.debug(f"[is_int_or_list] input is a 2 item list, but not within min, max: {input} [{min}, {max}] (False)")
-            return False, input
-        # _LOGGER.debug(f"[is_int_or_list] input is a list, but doesn't have 2 items: {input} (False)")
-        return False, input
-    # _LOGGER.debug(f"[is_int_or_list] input does not meet any criteria: {input}, type: {type(input)} (False)")
-    return False, input
+                if invar[0] == invar[1]:
+                    # _LOGGER.debug(f"[is_int_or_list] input is int in range: {invar} [{minvar}, {maxvar}] (True)")
+                    return True, invar[0]
+                # _LOGGER.debug(f"[is_int_or_list] input is a 2 int list within min, max: {invar} [{minvar}, {maxvar}] (True)")
+                return True, invar
+            # _LOGGER.debug(f"[is_int_or_list] input is a 2 item list, but not within min, max: {invar} [{minvar}, {maxvar}] (False)")
+            return False, invar
+        # _LOGGER.debug(f"[is_int_or_list] input is a list, but doesn't have 2 items: {invar} (False)")
+        return False, invar
+    # _LOGGER.debug(f"[is_int_or_list] input does not meet any criteria: {invar}, type: {type(invar)} (False)")
+    return False, invar
 
 
 def _is_int_list_or_all(
-    input: Any, min: int = None, max: int = None
+    invar: Any, minvar: int = None, maxvar: int = None
 ) -> tuple[bool, Any]:
-    # _LOGGER.debug(f"[is_int_list_or_all] starting input: {input}, type: {type(input)}")
-    if input is None:
-        # _LOGGER.debug(f"[is_int_list_or_all] input is None: {input} (True)")
-        return True, input
-    is_int_or_list_check, is_int_or_list_value = _is_int_or_list(input, min, max)
+    # _LOGGER.debug(f"[is_int_list_or_all] starting input: {invar}, type: {type(invar)}")
+    if invar is None:
+        # _LOGGER.debug(f"[is_int_list_or_all] input is None: {invar} (True)")
+        return True, invar
+    is_int_or_list_check, is_int_or_list_value = _is_int_or_list(invar, minvar, maxvar)
     if is_int_or_list_check:
         # _LOGGER.debug(f"[is_int_list_or_all] input is valid int or list: {is_int_or_list_value} (True)")
         return True, is_int_or_list_value
-    if isinstance(input, str):
-        input = input.strip()
-    if input == "all":
-        # _LOGGER.debug(f"[is_int_list_or_all] input is 'all': {input} (True)")
-        return True, input
-    # _LOGGER.debug(f"[is_int_list_or_all] input does not meet any criteria: {input}, type: {type(input)} (False)")
-    return False, input
+    if isinstance(invar, str):
+        invar = invar.strip()
+    if invar == "all":
+        # _LOGGER.debug(f"[is_int_list_or_all] input is 'all': {invar} (True)")
+        return True, invar
+    # _LOGGER.debug(f"[is_int_list_or_all] input does not meet any criteria: {invar}, type: {type(invar)} (False)")
+    return False, invar
 
 
-def _overrride_max_change_amount(input: Any, light_count: int) -> Any:
+def _overrride_max_change_amount(invar: Any, light_count: int) -> Any:
     _LOGGER.debug(
-        f"[overrride_max_change_amount] input: {input}, light_count: {light_count}"
+        "[overrride_max_change_amount] input: %s, light_count: %s", invar, light_count
     )
-    if isinstance(input, int) and input > light_count:
+    if isinstance(invar, int) and invar > light_count:
         # _LOGGER.debug("[overrride_max_change_amount] return: 'all'")
         return "all"
-    if isinstance(input, list) and input[1] > light_count:
-        if input[0] >= light_count:
+    if isinstance(invar, list) and invar[1] > light_count:
+        if invar[0] >= light_count:
             # _LOGGER.debug("[overrride_max_change_amount] return: 'all'")
             return "all"
-        input[1] = light_count
-    # _LOGGER.debug(f"[overrride_max_change_amount] return: {input}")
-    return input
+        invar[1] = light_count
+    # _LOGGER.debug(f"[overrride_max_change_amount] return: {invar}")
+    return invar
 
 
 def _clean_color_rgb_dict(color_rgb_dict: dict) -> dict:
-    _LOGGER.debug(f"[clean_color_rgb_dict] initial color_rgb_dict: {color_rgb_dict}")
+    _LOGGER.debug("[clean_color_rgb_dict] initial color_rgb_dict: %s", color_rgb_dict)
     for key, color in copy.deepcopy(color_rgb_dict).items():
         color_rgb_dict.get(key).pop(CONF_COLOR_ADD_COLOR, None)
         if color.get(CONF_COLOR_DELETE_COLOR, False):
             color_rgb_dict.pop(key, None)
         else:
             color_rgb_dict.get(key).pop(CONF_COLOR_DELETE_COLOR, None)
-    _LOGGER.debug(f"[clean_color_rgb_dict] final color_rgb_dict: {color_rgb_dict}")
+    _LOGGER.debug("[clean_color_rgb_dict] final color_rgb_dict: %s", color_rgb_dict)
     return color_rgb_dict
 
 
 async def _async_build_schema(
-    hass: HomeAssistant,
     user_input: list,
     default_dict: list,
     options_flow: bool = False,
@@ -358,7 +358,6 @@ async def _async_build_color_yaml_schema(
 
 
 async def _async_build_color_rgb_ui_schema(
-    hass: HomeAssistant,
     user_input: list,
     default_dict: list,
     options_flow: bool = False,
@@ -468,7 +467,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
     async def async_step_activity_sensor(
-        self, user_input: dict[str, Any] | None = None
+        self, _: MutableMapping[str, Any] | None = None
     ) -> ConfigFlowResult:
         self._data.update(
             {CONF_NAME: "Activity Sensor", CONF_ENTITY_TYPE: ENTITY_ACTIVITY_SENSOR}
@@ -501,7 +500,9 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
             self._data.update(user_input)
             self._data.update({CONF_ENTITY_TYPE: ENTITY_SCENE})
             _LOGGER.debug(
-                f"Checking Change Amount: {self._data.get(CONF_CHANGE_AMOUNT, None)}, type: {type(self._data.get(CONF_CHANGE_AMOUNT, None))}"
+                "Checking Change Amount: %s, type: %s",
+                self._data.get(CONF_CHANGE_AMOUNT, None),
+                type(self._data.get(CONF_CHANGE_AMOUNT, None)),
             )
             change_amount_check, change_amount_value = _is_int_list_or_all(
                 self._data.get(CONF_CHANGE_AMOUNT, None),
@@ -513,7 +514,9 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 self._errors["base"] = ERROR_CHANGE_AMOUNT_NOT_INT_OR_ALL
             _LOGGER.debug(
-                f"Checking Transition: {self._data.get(CONF_TRANSITION, None)}, type: {type(self._data.get(CONF_TRANSITION, None))}"
+                "Checking Transition: %s, type: %s",
+                self._data.get(CONF_TRANSITION, None),
+                type(self._data.get(CONF_TRANSITION, None)),
             )
             transition_check, transition_value = _is_int_or_list(
                 self._data.get(CONF_TRANSITION, None),
@@ -525,7 +528,9 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 self._errors["base"] = ERROR_TRANSITION_NOT_INT_OR_RANGE
             _LOGGER.debug(
-                f"Checking Change Frequency: {self._data.get(CONF_CHANGE_FREQUENCY, None)}, type: {type(self._data.get(CONF_CHANGE_FREQUENCY, None))}"
+                "Checking Change Frequency: %s, type: %s",
+                self._data.get(CONF_CHANGE_FREQUENCY, None),
+                type(self._data.get(CONF_CHANGE_FREQUENCY, None)),
             )
             change_frequency_check, change_frequency_value = _is_int_or_list(
                 self._data.get(CONF_CHANGE_FREQUENCY, None),
@@ -537,7 +542,9 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 self._errors["base"] = ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE
             _LOGGER.debug(
-                f"Checking Brightness: {self._data.get(CONF_BRIGHTNESS, None)}, type: {type(self._data.get(CONF_BRIGHTNESS, None))}"
+                "Checking Brightness: %s, type: %s",
+                self._data.get(CONF_BRIGHTNESS, None),
+                type(self._data.get(CONF_BRIGHTNESS, None)),
             )
             brightness_check, brightness_value = _is_int_or_list(
                 self._data.get(CONF_BRIGHTNESS, None),
@@ -562,7 +569,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
             # _LOGGER.debug(f"[async_step_scene] self._data: {self._data}")
-            if self._errors == {}:
+            if not self._errors:
                 if yaml_import:
                     self._data.update({CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_YAML})
                     return self.async_create_entry(
@@ -577,7 +584,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="scene",
-            data_schema=await _async_build_schema(self.hass, user_input, defaults),
+            data_schema=await _async_build_schema(user_input, defaults),
             errors=self._errors,
         )
 
@@ -601,7 +608,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
             # _LOGGER.debug(f"[async_step_color_yaml] self._data: {self._data}")
-            if self._errors == {}:
+            if not self._errors:
                 return self.async_create_entry(
                     title=self._data[CONF_NAME], data=self._data
                 )
@@ -631,7 +638,9 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             _LOGGER.debug(
-                f"Checking Brightnes: {user_input.get(CONF_BRIGHTNESS, None)}, type: {type(user_input.get(CONF_BRIGHTNESS, None))}"
+                "Checking Brightnes: %s, type: %s",
+                user_input.get(CONF_BRIGHTNESS, None),
+                type(user_input.get(CONF_BRIGHTNESS, None)),
             )
             brightness_check, brightness_value = _is_int_or_list(
                 user_input.get(CONF_BRIGHTNESS, None),
@@ -654,7 +663,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             for k, v in defaults.items():
                 user_input.setdefault(k, v)
-            if self._errors == {}:
+            if not self._errors:
                 color_uuid = uuid.random_uuid_hex()
                 self._data.get(CONF_COLOR_RGB_DICT).update({color_uuid: user_input})
                 # _LOGGER.debug(f"[async_step_color_rgb_ui] self._data: {self._data}")
@@ -674,9 +683,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="color_rgb_ui",
-            data_schema=await _async_build_color_rgb_ui_schema(
-                self.hass, user_input, defaults
-            ),
+            data_schema=await _async_build_color_rgb_ui_schema(user_input, defaults),
             errors=self._errors,
             description_placeholders={
                 "color_count": len(self._data.get(CONF_COLOR_RGB_DICT, {})) + 1,
@@ -688,7 +695,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Import a config entry from configuration.yaml."""
         import_config.update({CONF_ENTITY_TYPE: ENTITY_SCENE})
-        _LOGGER.debug(f"[async_step_import] import_config: {import_config}")
+        _LOGGER.debug("[async_step_import] import_config: %s", import_config)
         return await self.async_step_scene(user_input=import_config, yaml_import=True)
 
     @staticmethod
@@ -751,7 +758,9 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
             self._data.update(user_input)
             self._data.update({CONF_ENTITY_TYPE: ENTITY_SCENE})
             _LOGGER.debug(
-                f"Checking Change Amount: {self._data.get(CONF_CHANGE_AMOUNT, None)}, type: {type(self._data.get(CONF_CHANGE_AMOUNT, None))}"
+                "Checking Change Amount: %s, type: %s",
+                self._data.get(CONF_CHANGE_AMOUNT, None),
+                type(self._data.get(CONF_CHANGE_AMOUNT, None)),
             )
             change_amount_check, change_amount_value = _is_int_list_or_all(
                 self._data.get(CONF_CHANGE_AMOUNT, None),
@@ -763,7 +772,9 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
             else:
                 self._errors["base"] = ERROR_CHANGE_AMOUNT_NOT_INT_OR_ALL
             _LOGGER.debug(
-                f"Checking Transition: {self._data.get(CONF_TRANSITION, None)}, type: {type(self._data.get(CONF_TRANSITION, None))}"
+                "Checking Transition: %s, type: %s",
+                self._data.get(CONF_TRANSITION, None),
+                type(self._data.get(CONF_TRANSITION, None)),
             )
             transition_check, transition_value = _is_int_or_list(
                 self._data.get(CONF_TRANSITION, None),
@@ -775,7 +786,9 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
             else:
                 self._errors["base"] = ERROR_TRANSITION_NOT_INT_OR_RANGE
             _LOGGER.debug(
-                f"Checking Change Frequency: {self._data.get(CONF_CHANGE_FREQUENCY, None)}, type: {type(self._data.get(CONF_CHANGE_FREQUENCY, None))}"
+                "Checking Change Frequency: %s, type: %s",
+                self._data.get(CONF_CHANGE_FREQUENCY, None),
+                type(self._data.get(CONF_CHANGE_FREQUENCY, None)),
             )
             change_frequency_check, change_frequency_value = _is_int_or_list(
                 self._data.get(CONF_CHANGE_FREQUENCY, None),
@@ -787,7 +800,9 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
             else:
                 self._errors["base"] = ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE
             _LOGGER.debug(
-                f"Checking Brightness: {self._data.get(CONF_BRIGHTNESS, None)}, type: {type(self._data.get(CONF_BRIGHTNESS, None))}"
+                "Checking Brightness: %s, type: %s",
+                self._data.get(CONF_BRIGHTNESS, None),
+                type(self._data.get(CONF_BRIGHTNESS, None)),
             )
             brightness_check, brightness_value = _is_int_or_list(
                 self._data.get(CONF_BRIGHTNESS, None),
@@ -812,7 +827,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
             # _LOGGER.debug(f"[async_init_user] self._data: {self._data}")
-            if self._errors == {}:
+            if not self._errors:
                 if (
                     self._data.get(CONF_COLOR_SELECTOR_MODE, COLOR_SELECTOR_RGB_UI)
                     == COLOR_SELECTOR_RGB_UI
@@ -823,7 +838,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         return self.async_show_form(
             step_id="scene",
             data_schema=await _async_build_schema(
-                self.hass, user_input, self._data, options_flow=True
+                user_input, self._data, options_flow=True
             ),
             errors=self._errors,
             description_placeholders={"scene_name": self._data[CONF_NAME]},
@@ -849,7 +864,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
             # _LOGGER.debug(f"[async_step_color_yaml] self._data: {self._data}")
-            if self._errors == {}:
+            if not self._errors:
                 self._data.update({CONF_COLOR_RGB_DICT: {}})
                 self.hass.config_entries.async_update_entry(
                     self.config, data=self._data, options=self.config.options
@@ -888,7 +903,9 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             color_data.update(user_input)
             _LOGGER.debug(
-                f"Checking Brightnes: {color_data.get(CONF_BRIGHTNESS, None)}, type: {type(color_data.get(CONF_BRIGHTNESS, None))}"
+                "Checking Brightnes: %s, type: %s",
+                color_data.get(CONF_BRIGHTNESS, None),
+                type(color_data.get(CONF_BRIGHTNESS, None)),
             )
             brightness_check, brightness_value = _is_int_or_list(
                 color_data.get(CONF_BRIGHTNESS, None),
@@ -911,7 +928,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
             )
             for k, v in defaults.items():
                 color_data.setdefault(k, v)
-            if self._errors == {}:
+            if not self._errors:
                 if self._rgb_ui_color_index + 1 <= self._rgb_ui_color_max:
                     self._data.get(CONF_COLOR_RGB_DICT).update(
                         {self._rgb_ui_color_keys[self._rgb_ui_color_index]: color_data}
@@ -945,7 +962,6 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         return self.async_show_form(
             step_id="color_rgb_ui",
             data_schema=await _async_build_color_rgb_ui_schema(
-                self.hass,
                 user_input,
                 color_data,
                 options_flow=True,

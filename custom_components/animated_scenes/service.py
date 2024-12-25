@@ -4,24 +4,24 @@ from homeassistant.core import ServiceCall
 
 from .animations import Animations
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-async def start_animation(call: ServiceCall):
+async def start_animation(call: ServiceCall) -> None:
     _LOGGER.info("Starting animated lights...")
     await Animations.instance.start(call.data)
 
 
-async def stop_animation(call: ServiceCall):
+async def stop_animation(call: ServiceCall) -> None:
     _LOGGER.info("Stopping animated lights...")
     await Animations.instance.stop(call.data)
 
 
-async def remove_lights(call: ServiceCall):
+async def remove_lights(call: ServiceCall) -> None:
     _LOGGER.info("Removing lights from animations...")
     await Animations.instance.remove_lights(call.data)
 
 
-async def add_lights_to_animation(call: ServiceCall):
+async def add_lights_to_animation(call: ServiceCall) -> None:
     _LOGGER.info("Adding lights to animation...")
     await Animations.instance.add_lights_to_animation(call.data)
