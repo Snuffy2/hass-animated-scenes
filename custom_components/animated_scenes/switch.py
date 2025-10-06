@@ -14,7 +14,6 @@ import voluptuous as vol
 
 from homeassistant.components.switch import ENTITY_ID_FORMAT, SwitchEntity
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
-from homeassistant.const import CONF_BRIGHTNESS, CONF_ICON, CONF_LIGHTS, CONF_NAME, MATCH_ALL
 from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue
@@ -26,6 +25,7 @@ from .const import (
     COLOR_SELECTOR_RGB_UI,
     CONF_ANIMATE_BRIGHTNESS,
     CONF_ANIMATE_COLOR,
+    CONF_BRIGHTNESS,
     CONF_CHANGE_AMOUNT,
     CONF_CHANGE_FREQUENCY,
     CONF_CHANGE_SEQUENCE,
@@ -35,7 +35,10 @@ from .const import (
     CONF_COLOR_TYPE,
     CONF_COLORS,
     CONF_ENTITY_TYPE,
+    CONF_ICON,
     CONF_IGNORE_OFF,
+    CONF_LIGHTS,
+    CONF_NAME,
     CONF_PLATFORM,
     CONF_PRIORITY,
     CONF_RESTORE,
@@ -43,6 +46,7 @@ from .const import (
     CONF_TRANSITION,
     DOMAIN,
     INTEGRATION_NAME,
+    MATCH_ALL,
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

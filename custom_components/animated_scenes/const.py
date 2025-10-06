@@ -1,5 +1,13 @@
 """Constants for the Animated Scenes integration."""
 
+from homeassistant.const import (  # noqa: F401
+    CONF_BRIGHTNESS,
+    CONF_ICON,
+    CONF_LIGHTS,
+    CONF_NAME,
+    MATCH_ALL,
+)
+
 INTEGRATION_NAME = "Animated Scenes"
 DOMAIN = "animated_scenes"
 VERSION = "2.1.0"

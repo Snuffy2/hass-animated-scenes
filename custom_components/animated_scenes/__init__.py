@@ -12,7 +12,7 @@ from .const import CONF_ENTITY_TYPE, DOMAIN, ENTITY_ACTIVITY_SENSOR, ENTITY_SCEN
 from .service import add_lights_to_animation, remove_lights, start_animation, stop_animation
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
-PLATFORMS: list = [Platform.SWITCH, Platform.SENSOR]
+PLATFORMS: list = [Platform.SWITCH, Platform.SENSOR, Platform.IMAGE]
 
 
 async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
@@ -57,7 +57,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass_data = dict(entry.data)
     hass.data[DOMAIN][entry.entry_id] = hass_data
     if hass_data.get(CONF_ENTITY_TYPE, ENTITY_SCENE) == ENTITY_SCENE:
-        await hass.config_entries.async_forward_entry_setups(entry, [Platform.SWITCH])
+        await hass.config_entries.async_forward_entry_setups(
+            entry, [Platform.SWITCH, Platform.IMAGE]
+        )
     else:
         await hass.config_entries.async_forward_entry_setups(entry, [Platform.SENSOR])
     return True
