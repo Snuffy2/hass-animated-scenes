@@ -50,6 +50,30 @@ from .scene_config import START_SERVICE_CONFIG, build_colors_from_rgb_dict
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+ANIMATION_CONFIG_EXCLUDED_KEYS = (
+    CONF_PLATFORM,
+    CONF_ICON,
+    CONF_ENTITY_TYPE,
+    CONF_COLOR_RGB_DICT,
+    CONF_COLOR_SELECTOR_MODE,
+)
+
+EXTRA_STATE_ATTRIBUTE_KEYS = (
+    CONF_PRIORITY,
+    CONF_CHANGE_FREQUENCY,
+    CONF_TRANSITION,
+    CONF_CHANGE_AMOUNT,
+    CONF_BRIGHTNESS,
+    CONF_CHANGE_SEQUENCE,
+    CONF_ANIMATE_BRIGHTNESS,
+    CONF_ANIMATE_COLOR,
+    CONF_IGNORE_OFF,
+    CONF_RESTORE,
+    CONF_RESTORE_POWER,
+    CONF_LIGHTS,
+    CONF_COLORS,
+)
+
 PLATFORM_SCHEMA_PART = vol.Schema(
     {
         vol.Required(CONF_PLATFORM): DOMAIN,
@@ -71,10 +95,11 @@ async def async_setup_platform(
     into the UI-driven config entries system if the scene is not already
     registered.
     """
+    existing_titles = {entry.title for entry in hass.config_entries.async_entries(DOMAIN)}
     _LOGGER.debug(
         "[async_setup_platform] config name: %s, existing scenes title list: %s",
         config.get(CONF_NAME, None),
-        [x.title for x in hass.config_entries.async_entries(DOMAIN)],
+        existing_titles,
     )
     async_create_issue(
         hass,
@@ -91,9 +116,7 @@ async def async_setup_platform(
             "integration_title": INTEGRATION_NAME,
         },
     )
-    if config.get(CONF_NAME, None) not in [
-        x.title for x in hass.config_entries.async_entries(DOMAIN)
-    ]:
+    if config.get(CONF_NAME, None) not in existing_titles:
         hass.async_create_task(
             hass.config_entries.flow.async_init(
                 DOMAIN,
@@ -157,11 +180,8 @@ class AnimatedSceneSwitch(SwitchEntity):
             animation_config[CONF_COLORS] = build_colors_from_rgb_dict(
                 animation_config.get(CONF_COLOR_RGB_DICT, {})
             )
-        animation_config.pop(CONF_PLATFORM, None)
-        animation_config.pop(CONF_ICON, None)
-        animation_config.pop(CONF_ENTITY_TYPE, None)
-        animation_config.pop(CONF_COLOR_RGB_DICT, None)
-        animation_config.pop(CONF_COLOR_SELECTOR_MODE, None)
+        for key in ANIMATION_CONFIG_EXCLUDED_KEYS:
+            animation_config.pop(key, None)
         return animation_config
 
     @property
@@ -171,21 +191,7 @@ class AnimatedSceneSwitch(SwitchEntity):
         The attributes expose the animation configuration options for
         inspection in the UI.
         """
-        return {
-            CONF_PRIORITY: self._config.get(CONF_PRIORITY),
-            CONF_CHANGE_FREQUENCY: self._config.get(CONF_CHANGE_FREQUENCY),
-            CONF_TRANSITION: self._config.get(CONF_TRANSITION),
-            CONF_CHANGE_AMOUNT: self._config.get(CONF_CHANGE_AMOUNT),
-            CONF_BRIGHTNESS: self._config.get(CONF_BRIGHTNESS),
-            CONF_CHANGE_SEQUENCE: self._config.get(CONF_CHANGE_SEQUENCE),
-            CONF_ANIMATE_BRIGHTNESS: self._config.get(CONF_ANIMATE_BRIGHTNESS),
-            CONF_ANIMATE_COLOR: self._config.get(CONF_ANIMATE_COLOR),
-            CONF_IGNORE_OFF: self._config.get(CONF_IGNORE_OFF),
-            CONF_RESTORE: self._config.get(CONF_RESTORE),
-            CONF_RESTORE_POWER: self._config.get(CONF_RESTORE_POWER),
-            CONF_LIGHTS: self._config.get(CONF_LIGHTS),
-            CONF_COLORS: self._config.get(CONF_COLORS),
-        }
+        return {key: self._config.get(key) for key in EXTRA_STATE_ATTRIBUTE_KEYS}
 
     @property
     def is_on(self) -> bool:
@@ -254,9 +260,10 @@ class AnimatedSceneSwitch(SwitchEntity):
         If the switch is already on this is a no-op.
         """
         if not self._attr_is_on:
-            if Animations.instance:
+            manager = Animations.instance
+            if manager:
                 try:
-                    await Animations.instance.start(self._animation_config)
+                    await manager.start(self._animation_config)
                 except IntegrationError as err:
                     _LOGGER.error(
                         "Failed to start animated scene %s: %s",
@@ -264,7 +271,7 @@ class AnimatedSceneSwitch(SwitchEntity):
                         err,
                     )
                     return
-                self._attr_is_on = self._attr_name in Animations.instance.animations
+                self._attr_is_on = self._attr_name in manager.animations
             else:
                 _LOGGER.warning(
                     "[async_turn_on] Animations manager is not initialized; ignoring turn on"
@@ -273,5 +280,6 @@ class AnimatedSceneSwitch(SwitchEntity):
     async def async_turn_off(self, **_: Any) -> None:
         """Turn the switch off and stop the corresponding animation."""
         self._attr_is_on = False
-        if Animations.instance:
-            await Animations.instance.stop({"name": self._attr_name})
+        manager = Animations.instance
+        if manager:
+            await manager.stop({"name": self._attr_name})
