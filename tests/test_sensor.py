@@ -27,7 +27,6 @@ async def test_activity_sensor_writes_state_on_animation_event(hass: HomeAssista
     The activity sensor reports manager state, so it should react to the
     manager's event bus notifications instead of waiting for polling.
     """
-
     manager = Animations(hass)
     Animations.instance = manager
     sensor = AnimatedScenesSensor(hass)
@@ -53,7 +52,6 @@ async def test_activity_sensor_duplicate_check_uses_config_entries(
     Config flows can run before ``hass.data`` has been rebuilt, so duplicate
     activity-sensor suppression must inspect Home Assistant config entries.
     """
-
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Activity Sensor",

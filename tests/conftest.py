@@ -15,8 +15,8 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> Generat
 
     Yields:
         None: Control returns to pytest after custom integrations are enabled.
-    """
 
+    """
     yield
 
 
@@ -26,6 +26,6 @@ def integration_domain() -> str:
 
     Returns:
         str: The integration domain used by Home Assistant tests.
-    """
 
+    """
     return DOMAIN

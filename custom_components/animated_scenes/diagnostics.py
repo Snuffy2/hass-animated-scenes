@@ -28,7 +28,6 @@ def _redact(value: Any) -> Any:
         scalar value when no redaction is needed.
 
     """
-
     if isinstance(value, dict):
         return {
             key: ("**REDACTED**" if key in TO_REDACT else _redact(item))
@@ -53,7 +52,6 @@ async def async_get_config_entry_diagnostics(
         counts from the active animation manager.
 
     """
-
     manager = Animations.instance
     runtime = {
         "active_animation_count": len(manager.animations) if manager else 0,

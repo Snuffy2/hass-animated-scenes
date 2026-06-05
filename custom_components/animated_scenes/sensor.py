@@ -30,7 +30,6 @@ async def async_setup_entry(
 
     Register a single sensor entity that reports active animations.
     """
-
     async_add_entities([AnimatedScenesSensor(hass)])
 
 
@@ -47,7 +46,6 @@ class AnimatedScenesSensor(SensorEntity):
 
         Set static attributes such as name, unique id and entity id.
         """
-
         self.hass: HomeAssistant = hass
         self._attr_native_unit_of_measurement: str = "active animation(s)"
         self._attr_state_class: SensorStateClass = SensorStateClass.MEASUREMENT
@@ -65,7 +63,6 @@ class AnimatedScenesSensor(SensorEntity):
             False so Home Assistant does not periodically poll this entity.
 
         """
-
         return False
 
     @property
@@ -77,7 +74,6 @@ class AnimatedScenesSensor(SensorEntity):
             one integration device.
 
         """
-
         return {
             "identifiers": {(DOMAIN, "animated_scenes")},
             "name": INTEGRATION_NAME,
@@ -92,7 +88,6 @@ class AnimatedScenesSensor(SensorEntity):
             entity is removed.
 
         """
-
         self.async_on_remove(
             self.hass.bus.async_listen(EVENT_NAME_CHANGE, self._handle_animation_event)
         )
@@ -109,7 +104,6 @@ class AnimatedScenesSensor(SensorEntity):
             None.
 
         """
-
         self.async_write_ha_state()
 
     @property
@@ -126,7 +120,6 @@ class AnimatedScenesSensor(SensorEntity):
         Returns a mapping containing the list of active animations and the
         list of lights currently owned by animations.
         """
-
         if Animations.instance:
             return {
                 "active": list(Animations.instance.animations.keys()),

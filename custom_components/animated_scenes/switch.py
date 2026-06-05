@@ -70,7 +70,6 @@ async def async_setup_platform(
     into the UI-driven config entries system if the scene is not already
     registered.
     """
-
     _LOGGER.debug(
         "[async_setup_platform] config name: %s, existing scenes title list: %s",
         config.get(CONF_NAME, None),
@@ -113,7 +112,6 @@ async def async_setup_entry(
     Instantiate and register the `AnimatedSceneSwitch` entity for the
     provided config entry.
     """
-
     config = hass.data.get(DOMAIN).get(config_entry.entry_id)
     unique_id: str = config_entry.entry_id
     async_add_entities([AnimatedSceneSwitch(hass, config, unique_id)])
@@ -135,7 +133,6 @@ class AnimatedSceneSwitch(SwitchEntity):
         immediately so the entity can be turned on as soon as Home Assistant
         adds it.
         """
-
         _LOGGER.debug("[AnimatedSceneSwitch init] config: %s", config)
         # _LOGGER.debug(f"[AnimatedSceneSwitch init] unique_id: {unique_id}")
         self.hass: HomeAssistant = hass
@@ -155,7 +152,6 @@ class AnimatedSceneSwitch(SwitchEntity):
             UI-only color selector fields removed.
 
         """
-
         if self._config.get(CONF_COLOR_SELECTOR_MODE, None) == COLOR_SELECTOR_RGB_UI:
             self._config[CONF_COLORS] = build_colors_from_rgb_dict(
                 self._config.get(CONF_COLOR_RGB_DICT, {})
@@ -175,7 +171,6 @@ class AnimatedSceneSwitch(SwitchEntity):
         The attributes expose the animation configuration options for
         inspection in the UI.
         """
-
         return {
             CONF_PRIORITY: self._config.get(CONF_PRIORITY),
             CONF_CHANGE_FREQUENCY: self._config.get(CONF_CHANGE_FREQUENCY),
@@ -201,7 +196,6 @@ class AnimatedSceneSwitch(SwitchEntity):
             locally; false after a stop event or local turn-off.
 
         """
-
         return self._attr_is_on
 
     @property
@@ -213,7 +207,6 @@ class AnimatedSceneSwitch(SwitchEntity):
             one integration device.
 
         """
-
         return {
             "identifiers": {(DOMAIN, "animated_scenes")},
             "name": INTEGRATION_NAME,
@@ -228,7 +221,6 @@ class AnimatedSceneSwitch(SwitchEntity):
             Assistant so it is cleaned up automatically when the entity unloads.
 
         """
-
         self.async_on_remove(
             self.hass.bus.async_listen(EVENT_NAME_CHANGE, self._handle_animation_event)
         )
@@ -245,7 +237,6 @@ class AnimatedSceneSwitch(SwitchEntity):
             None. Unrelated animation events are ignored.
 
         """
-
         if event.data.get("animation") != self._attr_name:
             return
         state = event.data.get("state")
@@ -262,7 +253,6 @@ class AnimatedSceneSwitch(SwitchEntity):
 
         If the switch is already on this is a no-op.
         """
-
         if not self._attr_is_on:
             if Animations.instance:
                 await Animations.instance.start(self._animation_config)
@@ -274,7 +264,6 @@ class AnimatedSceneSwitch(SwitchEntity):
 
     async def async_turn_off(self, **_: Any) -> None:
         """Turn the switch off and stop the corresponding animation."""
-
         self._attr_is_on = False
         if Animations.instance:
             await Animations.instance.stop({"name": self._attr_name})

@@ -340,7 +340,6 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
         Validates and normalizes user input before continuing to color
         configuration steps or creating the config entry.
         """
-
         errors: dict[str, Any] = {}
 
         # Defaults
@@ -515,7 +514,6 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the options."""
-
         if self._data.get(CONF_ENTITY_TYPE, ENTITY_SCENE) == ENTITY_ACTIVITY_SENSOR:
             return self.async_abort(reason=ABORT_ACTIVITY_SENSOR_NO_OPTIONS)
         if self._data.get(CONF_ENTITY_TYPE) is None:
@@ -528,7 +526,6 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         Validate and normalize the provided options and either proceed to
         color configuration steps or update the entry data.
         """
-
         errors: dict[str, Any] = {}
 
         # Defaults

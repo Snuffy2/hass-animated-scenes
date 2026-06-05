@@ -24,8 +24,8 @@ def _switch_config() -> dict[str, object]:
     Returns:
         A config-entry data dictionary that exercises RGB UI color conversion
         and contains the runtime keys required to start an animation.
-    """
 
+    """
     return {
         "name": "Spooky",
         "icon": "mdi:lightbulb",
@@ -58,7 +58,6 @@ async def test_switch_animation_config_ready_in_constructor(hass: HomeAssistant)
     immediate service or UI turn-on cannot start an animation with an empty
     config.
     """
-
     switch = AnimatedSceneSwitch(hass, _switch_config(), "entry-id")
 
     assert switch._animation_config["colors"] == [  # noqa: SLF001
@@ -74,7 +73,6 @@ async def test_switch_animation_config_ready_in_constructor(hass: HomeAssistant)
 @pytest.mark.asyncio
 async def test_switch_tracks_animation_events(hass: HomeAssistant) -> None:
     """Update switch state immediately when animation lifecycle events fire."""
-
     switch = AnimatedSceneSwitch(hass, _switch_config(), "entry-id")
     switch.hass = hass
     switch.async_write_ha_state = Mock()  # type: ignore[method-assign]

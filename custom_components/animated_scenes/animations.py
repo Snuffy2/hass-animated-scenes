@@ -398,7 +398,6 @@ class Animation:
             original configured color).
 
         """
-
         ctype = color[CONF_COLOR_TYPE]
         if ctype == ATTR_RGB_COLOR:
             try:
@@ -933,8 +932,8 @@ class Animations:
         Returns:
             None. Missing names are ignored because unload/reload cleanup can
             race with service-driven stops.
-        """
 
+        """
         animation = self.animations.get(name)
         if animation is not None:
             await animation.stop()
@@ -946,8 +945,8 @@ class Animations:
         Returns:
             None. The method snapshots current animations before awaiting so
             individual stop calls can mutate the manager safely.
-        """
 
+        """
         animations = list(self.animations.values())
         await asyncio.gather(*(animation.stop() for animation in animations))
 
@@ -957,8 +956,8 @@ class Animations:
         Returns:
             None. This is intended for full integration teardown after all
             config entries have unloaded.
-        """
 
+        """
         if self._external_light_listener is not None:
             self._external_light_listener()
             self._external_light_listener = None

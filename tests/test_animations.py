@@ -30,8 +30,8 @@ def _animation_config(name: str, lights: list[str], priority: int = 0) -> dict[s
     Returns:
         A service-schema-compatible configuration dictionary for constructing
         an ``Animation`` directly in manager unit tests.
-    """
 
+    """
     return {
         "name": name,
         "lights": lights,
@@ -56,8 +56,8 @@ def _scene_entry() -> ConfigEntry:
     Returns:
         A Home Assistant ``ConfigEntry`` carrying the minimal Animated Scenes
         scene data needed by ``async_unload_entry``.
-    """
 
+    """
     return ConfigEntry(
         version=1,
         minor_version=1,
@@ -81,7 +81,6 @@ async def test_services_register_with_schema(hass: HomeAssistant) -> None:
     service handler runs. This protects the runtime manager from receiving
     malformed service data through the public service API.
     """
-
     assert await async_setup(hass, {}) is True
 
     registrations = hass.services.async_services_internal()[DOMAIN]
@@ -106,7 +105,6 @@ async def test_release_light_removes_owner_when_no_successor(hass: HomeAssistant
     ``_light_animations`` entries because later animations use those maps to
     decide whether a light is already owned.
     """
-
     manager = Animations(hass)
     Animations.instance = manager
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
@@ -133,7 +131,6 @@ async def test_release_light_hands_owner_to_next_priority(hass: HomeAssistant) -
     owner should update ``light_owner`` and retain the stored original state so
     the final owner can restore it later.
     """
-
     manager = Animations(hass)
     Animations.instance = manager
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
@@ -162,7 +159,6 @@ async def test_release_light_skip_ownership_keeps_remaining_owner(
     another animation still tracks that light, the manager must retain a
     coherent owner so the remaining animation can keep ticking safely.
     """
-
     manager = Animations(hass)
     Animations.instance = manager
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
@@ -189,7 +185,6 @@ async def test_manager_stop_by_name_stops_running_animation(hass: HomeAssistant)
     able to stop the matching runtime animation directly instead of fabricating
     service data for the public ``stop_animation`` handler.
     """
-
     manager = Animations(hass)
     animation = AsyncMock()
     animation.name = "Spooky"
@@ -208,7 +203,6 @@ async def test_unload_entry_stops_scene_animation(hass: HomeAssistant) -> None:
     Unload must stop that runtime task so it does not continue controlling
     lights after Home Assistant removes the config entry's platform entity.
     """
-
     manager = Animations(hass)
     Animations.instance = manager
     animation = AsyncMock()
@@ -242,8 +236,8 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
 
             Args:
                 manager: Runtime manager that owns this stub animation.
-            """
 
+            """
             self.manager = manager
             self.stop_count = 0
 
@@ -253,8 +247,8 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
             Returns:
                 None. The method mirrors the real animation path that calls
                 ``release_animation`` before control returns to unload cleanup.
-            """
 
+            """
             self.stop_count += 1
             self.manager.release_animation(self)
 
@@ -289,7 +283,6 @@ async def test_unload_entry_keeps_animation_when_platform_unload_fails(
     loaded. Runtime cleanup must therefore wait until ``async_unload_platforms``
     succeeds.
     """
-
     manager = Animations(hass)
     Animations.instance = manager
     animation = AsyncMock()

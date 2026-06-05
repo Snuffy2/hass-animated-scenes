@@ -24,7 +24,6 @@ async def test_diagnostics_redacts_entity_ids_and_reports_runtime(
     hass: HomeAssistant,
 ) -> None:
     """Return redacted config data with a summary of runtime manager state."""
-
     manager = Animations(hass)
     Animations.instance = manager
     manager.light_owner["light.kitchen"] = object()  # type: ignore[assignment]
@@ -43,7 +42,6 @@ async def test_diagnostics_redacts_entity_ids_and_reports_runtime(
 @pytest.mark.asyncio
 async def test_diagnostics_reports_zero_runtime_without_manager(hass: HomeAssistant) -> None:
     """Return zero runtime counters when no animation manager is active."""
-
     Animations.instance = None
 
     diagnostics = await async_get_config_entry_diagnostics(hass, _diagnostic_entry())
@@ -57,7 +55,6 @@ async def test_diagnostics_reports_zero_runtime_without_manager(hass: HomeAssist
 
 def test_entities_expose_animated_scenes_device_info(hass: HomeAssistant) -> None:
     """Group switch and sensor entities under the Animated Scenes device."""
-
     switch = AnimatedSceneSwitch(hass, _switch_config(), "entry-id")
     sensor = AnimatedScenesSensor(hass)
     expected_device = {
@@ -78,7 +75,6 @@ def _diagnostic_entry() -> ConfigEntry:
         user-authored scene name.
 
     """
-
     return ConfigEntry(
         version=1,
         minor_version=1,
@@ -108,7 +104,6 @@ def _switch_config() -> dict[str, object]:
         build the runtime animation config.
 
     """
-
     return {
         "name": "Spooky",
         "icon": "mdi:lightbulb",
