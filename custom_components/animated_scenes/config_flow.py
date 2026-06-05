@@ -502,11 +502,10 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         """Initialize."""
         self.config = config_entry
         self._data = dict(config_entry.data)
-        rgb_dict = self._data.get(CONF_COLOR_RGB_DICT)
-        if rgb_dict:
-            self._rgb_ui_color_keys = list(self._data.get(CONF_COLOR_RGB_DICT, {}).keys())
-            self._rgb_ui_color_values = list(self._data.get(CONF_COLOR_RGB_DICT, {}).values())
-            self._rgb_ui_color_max = len(self._rgb_ui_color_keys)
+        rgb_dict = self._data.get(CONF_COLOR_RGB_DICT, {})
+        self._rgb_ui_color_keys = list(rgb_dict)
+        self._rgb_ui_color_values = list(rgb_dict.values())
+        self._rgb_ui_color_max = len(self._rgb_ui_color_keys)
         self._rgb_ui_color_index = 0
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
