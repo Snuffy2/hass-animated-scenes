@@ -380,6 +380,19 @@ async def test_remove_lights_fires_activity_update(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
+async def test_setup_entry_recreates_manager_after_last_entry_unload(
+    hass: HomeAssistant,
+) -> None:
+    """Recreate the runtime manager when a reload sets up the entry again."""
+    Animations.instance = None
+    entry = _scene_entry()
+    with patch.object(hass.config_entries, "async_forward_entry_setups", AsyncMock()):
+        assert await async_setup_entry(hass, entry) is True
+
+    assert Animations.instance is not None
+
+
+@pytest.mark.asyncio
 async def test_unload_entry_keeps_animation_when_platform_unload_fails(
     hass: HomeAssistant,
 ) -> None:
