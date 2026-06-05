@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import IntegrationError
@@ -138,3 +138,20 @@ async def test_switch_rejects_empty_rgb_ui_colors_before_animation_loop(
 
     assert switch.is_on is False
     assert manager.animations == {}
+
+
+@pytest.mark.asyncio
+async def test_switch_stays_off_when_one_shot_animation_releases(
+    hass: HomeAssistant,
+) -> None:
+    """Keep the switch off when start completes without a running animation."""
+    manager = Animations(hass)
+    Animations.instance = manager
+    switch = AnimatedSceneSwitch(hass, _switch_config(), "entry-id")
+    switch.hass = hass
+
+    with patch.object(manager, "start", AsyncMock()) as start:
+        await switch.async_turn_on()
+
+    start.assert_awaited_once()
+    assert switch.is_on is False

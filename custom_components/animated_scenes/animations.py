@@ -1000,6 +1000,13 @@ class Animations:
         del self.animations[animation.name]
         self.refresh_listener()
 
+    def _fire_animation_updated(self, name: str) -> None:
+        """Notify entities that runtime animation attributes changed."""
+        self.hass.bus.fire(
+            EVENT_NAME_CHANGE,
+            {"animation": name, "state": EVENT_STATE_UPDATED},
+        )
+
     async def release_light(
         self,
         animation: Animation,
@@ -1106,7 +1113,7 @@ class Animations:
             self._light_animations[light].append(animation)
 
         animation.add_lights(lights)
-        self.fire_animation_change(animation.name, EVENT_STATE_UPDATED)
+        self._fire_animation_updated(name)
 
     async def remove_lights(self, data: dict[str, Any]) -> None:
         """Service handler to remove lights from animations and optionally restore."""
@@ -1127,6 +1134,8 @@ class Animations:
         for light in lights:
             if light in self._light_animations and not self._light_animations[light]:
                 del self._light_animations[light]
+        for animation in affected_animations:
+            self._fire_animation_updated(animation.name)
         for animation in affected_animations:
             if len(animation.get_active_lights()) == 0:
                 await animation.stop()

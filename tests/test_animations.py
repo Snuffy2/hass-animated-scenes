@@ -6,6 +6,7 @@ from types import MappingProxyType
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import ConfigEntry, DiscoveryKey
+from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 import pytest
 
@@ -13,6 +14,8 @@ from custom_components.animated_scenes import async_setup, async_setup_entry, as
 from custom_components.animated_scenes.animations import Animation, Animations
 from custom_components.animated_scenes.const import (
     CONF_ENTITY_TYPE,
+    CONF_LIGHTS,
+    CONF_SKIP_RESTORE,
     DOMAIN,
     ENTITY_SCENE,
     EVENT_NAME_CHANGE,
@@ -186,6 +189,47 @@ async def test_release_light_skip_ownership_keeps_remaining_owner(
     assert manager.light_owner["light.one"] is remaining
     assert manager._light_animations["light.one"] == [remaining]
     assert "light.one" in manager.states
+
+
+@pytest.mark.asyncio
+async def test_add_lights_to_animation_fires_update_event(hass: HomeAssistant) -> None:
+    """Notify event-driven entities after adding lights to a running animation."""
+    manager = Animations(hass)
+    Animations.instance = manager
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+    hass.states.async_set("light.two", "on", {"brightness": 100, "color_mode": "rgb"})
+    animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
+    manager.animations[animation.name] = animation
+
+    events = []
+    hass.bus.async_listen(EVENT_NAME_CHANGE, lambda event: events.append(event.data))
+
+    await manager.add_lights_to_animation({CONF_NAME: "Spooky", CONF_LIGHTS: ["light.two"]})
+    await hass.async_block_till_done()
+
+    assert {"animation": "Spooky", "state": EVENT_STATE_UPDATED} in events
+
+
+@pytest.mark.asyncio
+async def test_remove_lights_fires_update_event(hass: HomeAssistant) -> None:
+    """Notify event-driven entities after removing lights from animations."""
+    manager = Animations(hass)
+    Animations.instance = manager
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+    animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
+    manager.animations[animation.name] = animation
+    manager.light_owner["light.one"] = animation
+    manager._light_animations["light.one"] = [animation]
+
+    events = []
+    hass.bus.async_listen(EVENT_NAME_CHANGE, lambda event: events.append(event.data))
+
+    with patch.object(manager, "release_light", AsyncMock()) as release_light:
+        await manager.remove_lights({CONF_LIGHTS: ["light.one"], CONF_SKIP_RESTORE: True})
+    await hass.async_block_till_done()
+
+    release_light.assert_awaited_once_with(animation, "light.one", True, True)
+    assert {"animation": "Spooky", "state": EVENT_STATE_UPDATED} in events
 
 
 @pytest.mark.asyncio
