@@ -135,7 +135,6 @@ class AnimatedSceneSwitch(SwitchEntity):
         adds it.
         """
         _LOGGER.debug("[AnimatedSceneSwitch init] config: %s", config)
-        # _LOGGER.debug(f"[AnimatedSceneSwitch init] unique_id: {unique_id}")
         self.hass: HomeAssistant = hass
         self._config = config
         self._attr_name: str = config[CONF_NAME]

@@ -391,7 +391,6 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_activity_sensor(self, _: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Create an activity sensor config entry immediately."""
         self._data.update({CONF_NAME: "Activity Sensor", CONF_ENTITY_TYPE: ENTITY_ACTIVITY_SENSOR})
-        # _LOGGER.debug(f"[async_step_activity_sensor] self._data: {self._data}")
         return self.async_create_entry(title="Activity Sensor", data=self._data)
 
     async def async_step_scene(
@@ -416,7 +415,6 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = str(err)
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
-            # _LOGGER.debug(f"[async_step_scene] self._data: {self._data}")
             if not errors:
                 if yaml_import:
                     self._data.update({CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_YAML})
@@ -440,13 +438,8 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle color configuration when the user chooses YAML input."""
         errors: dict[str, Any] = {}
 
-        # Defaults
-        defaults: dict[str, Any] = {}
-
         if user_input is not None:
             self._data.update(user_input)
-            for k, v in defaults.items():
-                self._data.setdefault(k, v)
             if self._data.get(CONF_COLORS) in (None, {}, []):
                 errors["base"] = ERROR_COLORS_IS_BLANK
             elif not isinstance(self._data.get(CONF_COLORS), list):
@@ -456,12 +449,11 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
                     _validate_yaml_runtime_data(self._data)
                 except vol.Invalid:
                     errors["base"] = ERROR_COLORS_MALFORMED
-            # _LOGGER.debug(f"[async_step_color_yaml] self._data: {self._data}")
             if not errors:
                 return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
         return self.async_show_form(
             step_id="color_yaml",
-            data_schema=_build_color_yaml_schema(user_input, defaults),
+            data_schema=_build_color_yaml_schema(user_input, {}),
             errors=errors,
             description_placeholders={
                 "component_color_config_url": COMPONENT_COLOR_CONFIG_URL,
@@ -480,7 +472,6 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
             if not errors:
                 color_uuid = uuid.random_uuid_hex()
                 self._data.setdefault(CONF_COLOR_RGB_DICT, {}).update({color_uuid: user_input})
-                # _LOGGER.debug(f"[async_step_color_rgb_ui] self._data: {self._data}")
                 if user_input.get(CONF_COLOR_ADD_COLOR, False):
                     return await self.async_step_color_rgb_ui()
                 self._data.update(
@@ -491,7 +482,6 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
                     }
                 )
                 return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
-            # _LOGGER.debug(f"[async_step_color_rgb_ui] user_input: {user_input}")
 
         return self.async_show_form(
             step_id="color_rgb_ui",
@@ -572,7 +562,6 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                 errors["base"] = str(err)
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
-            # _LOGGER.debug(f"[async_init_user] self._data: {self._data}")
             if not errors:
                 if (
                     self._data.get(CONF_COLOR_SELECTOR_MODE, COLOR_SELECTOR_RGB_UI)
@@ -594,13 +583,8 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         """Handle color configuration in YAML mode within the options flow."""
         errors: dict[str, Any] = {}
 
-        # Defaults
-        defaults: dict[str, Any] = {}
-
         if user_input is not None:
             self._data.update(user_input)
-            for k, v in defaults.items():
-                self._data.setdefault(k, v)
             if self._data.get(CONF_COLORS) in (None, {}, []):
                 errors["base"] = ERROR_COLORS_IS_BLANK
             elif not isinstance(self._data.get(CONF_COLORS), list):
@@ -610,7 +594,6 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                     _validate_yaml_runtime_data(self._data)
                 except vol.Invalid:
                     errors["base"] = ERROR_COLORS_MALFORMED
-            # _LOGGER.debug(f"[async_step_color_yaml] self._data: {self._data}")
             if not errors:
                 self._data.update({CONF_COLOR_RGB_DICT: {}})
                 await self._async_stop_previous_animation_if_renamed()
@@ -659,7 +642,6 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                     self._rgb_ui_color_index + 1 >= self._rgb_ui_color_max
                     and color_data.get(CONF_COLOR_ADD_COLOR, False)
                 ):
-                    # _LOGGER.debug(f"[async_step_color_rgb_ui] self._data: {self._data}")
                     self._rgb_ui_color_index += 1
                     return await self.async_step_color_rgb_ui()
                 self._data.update({CONF_COLORS: {}})
@@ -670,7 +652,6 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                         )
                     }
                 )
-                # _LOGGER.debug(f"[async_step_color_rgb_ui] self._data: {self._data}")
                 await self._async_stop_previous_animation_if_renamed()
                 self.hass.config_entries.async_update_entry(
                     self.config,
@@ -680,7 +661,6 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                 )
                 await self.hass.config_entries.async_reload(self.config.entry_id)
                 return self.async_create_entry(title="", data={})
-            # _LOGGER.debug(f"[async_step_color_rgb_ui] color_data: {color_data}")
 
         return self.async_show_form(
             step_id="color_rgb_ui",
