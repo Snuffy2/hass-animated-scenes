@@ -138,6 +138,7 @@ START_SERVICE_CONFIG = {
     vol.Optional(CONF_CHANGE_AMOUNT, default=DEFAULT_CHANGE_AMOUNT): vol.Any(
         "all",
         vol.All(vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)),
+        vol.Match(r"^\[\s*\d+\s*,\s*\d+\s*\]$"),
         vol.ExactSequence(
             (
                 vol.All(vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)),

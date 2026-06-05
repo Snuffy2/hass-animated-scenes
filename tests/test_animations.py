@@ -267,6 +267,32 @@ async def test_start_clamps_oversized_change_amount(hass: HomeAssistant) -> None
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("change_amount", ["3", "[1, 3]"])
+async def test_start_service_accepts_text_change_amount(
+    hass: HomeAssistant,
+    change_amount: str,
+) -> None:
+    """Accept change_amount values submitted by the text service selector."""
+    await async_setup(hass, {})
+    assert Animations.instance is not None
+    manager = Animations.instance
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+
+    await hass.services.async_call(
+        DOMAIN,
+        "start_animation",
+        {
+            **_animation_config("Spooky", ["light.one"]),
+            "change_amount": change_amount,
+            "change_frequency": 0,
+        },
+        blocking=True,
+    )
+
+    assert manager.animations == {}
+
+
+@pytest.mark.asyncio
 async def test_manager_stop_by_name_stops_running_animation(hass: HomeAssistant) -> None:
     """Stop a named animation without requiring service-call validation.
 

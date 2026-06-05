@@ -13,13 +13,7 @@ jobs:
     name: pytest and coverage report
     runs-on: ubuntu-latest
     permissions:
-      # Gives the action the necessary permissions for publishing new
-      # comments in pull requests.
-      pull-requests: write
-      # Gives the action the necessary permissions for pushing data to the
-      # python-coverage-comment-action branch, and for editing existing
-      # comments (to avoid publishing multiple comments in the same PR)
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout Repository
