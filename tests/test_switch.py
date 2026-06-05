@@ -5,7 +5,9 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from homeassistant.core import HomeAssistant
+import pytest
 
+from custom_components.animated_scenes.animations import Animations
 from custom_components.animated_scenes.const import (
     COLOR_SELECTOR_RGB_UI,
     CONF_COLOR_RGB_DICT,
@@ -15,7 +17,6 @@ from custom_components.animated_scenes.const import (
     EVENT_STATE_STOPPED,
 )
 from custom_components.animated_scenes.switch import AnimatedSceneSwitch
-import pytest
 
 
 def _switch_config() -> dict[str, object]:
@@ -103,3 +104,18 @@ async def test_switch_tracks_animation_events(hass: HomeAssistant) -> None:
 
         assert switch.is_on is False
         assert write_state.call_count == started_write_count + 1
+
+
+@pytest.mark.asyncio
+async def test_switch_turn_on_stays_off_for_one_shot_scene(hass: HomeAssistant) -> None:
+    """Keep one-shot scenes off after the manager releases them during startup."""
+    manager = Animations(hass)
+    Animations.instance = manager
+    config = _switch_config()
+    config["change_frequency"] = 0
+    switch = AnimatedSceneSwitch(hass, config, "entry-id")
+
+    await switch.async_turn_on()
+
+    assert switch.is_on is False
+    assert manager.animations == {}

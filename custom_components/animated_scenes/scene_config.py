@@ -111,9 +111,15 @@ START_SERVICE_CONFIG = {
         vol.All([VALID_TRANSITION]),
     ),
     vol.Optional(CONF_CHANGE_FREQUENCY, default=DEFAULT_CHANGE_FREQUENCY): vol.Any(
-        vol.Coerce(float),
-        vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX),
-        vol.All([vol.Coerce(float), vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX)]),
+        vol.All(vol.Coerce(float), vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX)),
+        vol.All(
+            [
+                vol.All(
+                    vol.Coerce(float),
+                    vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX),
+                )
+            ]
+        ),
     ),
     vol.Optional(CONF_CHANGE_AMOUNT, default=DEFAULT_CHANGE_AMOUNT): vol.Any(
         "all",

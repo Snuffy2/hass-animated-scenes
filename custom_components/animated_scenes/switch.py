@@ -256,7 +256,7 @@ class AnimatedSceneSwitch(SwitchEntity):
         if not self._attr_is_on:
             if Animations.instance:
                 await Animations.instance.start(self._animation_config)
-                self._attr_is_on = True
+                self._attr_is_on = self._attr_name in Animations.instance.animations
             else:
                 _LOGGER.warning(
                     "[async_turn_on] Animations manager is not initialized; ignoring turn on"
