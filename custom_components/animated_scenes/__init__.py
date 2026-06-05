@@ -79,6 +79,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         True when the entry setup has been forwarded successfully.
 
     """
+    if Animations.instance is None:
+        Animations.instance = Animations(hass)
     hass.data.setdefault(DOMAIN, {})
     hass_data = dict(entry.data)
     hass.data[DOMAIN][entry.entry_id] = hass_data
@@ -125,9 +127,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if name:
                 await manager.stop_by_name(name)
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
-        if not hass.data.get(DOMAIN):
-            if Animations.instance:
-                await Animations.instance.stop_all()
-                Animations.instance.clear_runtime_state()
-            Animations.instance = None
+        if not hass.data.get(DOMAIN) and Animations.instance:
+            await Animations.instance.stop_all()
+            Animations.instance.clear_runtime_state()
     return unload_ok

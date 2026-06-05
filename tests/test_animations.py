@@ -7,17 +7,23 @@ from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import ConfigEntry, DiscoveryKey
 from homeassistant.core import HomeAssistant
+import pytest
 
-from custom_components.animated_scenes import async_setup, async_unload_entry
+from custom_components.animated_scenes import async_setup, async_setup_entry, async_unload_entry
 from custom_components.animated_scenes.animations import Animation, Animations
-from custom_components.animated_scenes.const import CONF_ENTITY_TYPE, DOMAIN, ENTITY_SCENE
+from custom_components.animated_scenes.const import (
+    CONF_ENTITY_TYPE,
+    DOMAIN,
+    ENTITY_SCENE,
+    EVENT_NAME_CHANGE,
+    EVENT_STATE_UPDATED,
+)
 from custom_components.animated_scenes.scene_config import (
     ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA,
     REMOVE_LIGHTS_SERVICE_SCHEMA,
     START_SERVICE_SCHEMA,
     STOP_SERVICE_SCHEMA,
 )
-import pytest
 
 DISCOVERY_KEYS: MappingProxyType[str, tuple[DiscoveryKey, ...]] = MappingProxyType({})
 
@@ -278,7 +284,55 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
     assert manager.states == {}
     assert manager.light_owner == {}
     assert manager._light_animations == {}
-    assert Animations.instance is None
+    assert Animations.instance is manager
+
+
+@pytest.mark.asyncio
+async def test_setup_entry_recreates_missing_manager(hass: HomeAssistant) -> None:
+    """Recover the runtime manager when a config-entry reload finds it missing."""
+    Animations.instance = None
+    entry = _scene_entry()
+
+    with patch.object(hass.config_entries, "async_forward_entry_setups", return_value=True):
+        assert await async_setup_entry(hass, entry) is True
+
+    assert isinstance(Animations.instance, Animations)
+
+
+@pytest.mark.asyncio
+async def test_add_lights_to_animation_fires_activity_update(hass: HomeAssistant) -> None:
+    """Notify sensors when service calls add lights to a running animation."""
+    manager = Animations(hass)
+    animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
+    manager.animations["Spooky"] = animation
+    manager.light_owner["light.one"] = animation
+    manager._light_animations["light.one"] = [animation]
+    events: list[dict[str, str]] = []
+    hass.bus.async_listen(EVENT_NAME_CHANGE, lambda event: events.append(event.data))
+
+    await manager.add_lights_to_animation(
+        {"name": "Spooky", "lights": ["light.two"]},
+    )
+    await hass.async_block_till_done()
+
+    assert events == [{"animation": "Spooky", "state": EVENT_STATE_UPDATED}]
+
+
+@pytest.mark.asyncio
+async def test_remove_lights_fires_activity_update(hass: HomeAssistant) -> None:
+    """Notify sensors when service calls remove lights from a running animation."""
+    manager = Animations(hass)
+    animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
+    manager.animations["Spooky"] = animation
+    manager.light_owner["light.one"] = animation
+    manager._light_animations["light.one"] = [animation]
+    events: list[dict[str, str]] = []
+    hass.bus.async_listen(EVENT_NAME_CHANGE, lambda event: events.append(event.data))
+
+    await manager.remove_lights({"lights": ["light.one"], "skip_restore": True})
+    await hass.async_block_till_done()
+
+    assert events == [{"animation": "Spooky", "state": EVENT_STATE_UPDATED}]
 
 
 @pytest.mark.asyncio

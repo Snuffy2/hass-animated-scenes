@@ -74,6 +74,7 @@ from .const import (
     EVENT_NAME_CHANGE,
     EVENT_STATE_STARTED,
     EVENT_STATE_STOPPED,
+    EVENT_STATE_UPDATED,
     MAX_KELVIN,
     MIN_KELVIN,
 )
@@ -966,6 +967,13 @@ class Animations:
         self.light_owner.clear()
         self._conflicted_lights.clear()
 
+    def fire_animation_change(self, animation_name: str, state: str) -> None:
+        """Notify Home Assistant that animation activity changed."""
+        self.hass.bus.fire(
+            EVENT_NAME_CHANGE,
+            {"animation": animation_name, "state": state},
+        )
+
     def refresh_listener(self) -> None:
         """Refresh the external state change listener used to track lights.
 
@@ -1098,6 +1106,7 @@ class Animations:
             self._light_animations[light].append(animation)
 
         animation.add_lights(lights)
+        self.fire_animation_change(animation.name, EVENT_STATE_UPDATED)
 
     async def remove_lights(self, data: dict[str, Any]) -> None:
         """Service handler to remove lights from animations and optionally restore."""
@@ -1121,6 +1130,7 @@ class Animations:
         for animation in affected_animations:
             if len(animation.get_active_lights()) == 0:
                 await animation.stop()
+            self.fire_animation_change(animation.name, EVENT_STATE_UPDATED)
 
     def store_state(self, light: str) -> None:
         """Store the current state of a light for later restoration."""

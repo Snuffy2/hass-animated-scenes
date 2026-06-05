@@ -274,6 +274,53 @@ def is_int_or_list(
     return False, value
 
 
+def is_number(value: Any) -> tuple[bool, Any]:
+    """Return whether value is numeric and its normalized value."""
+    if value is None or not isinstance(value, int | float | str):
+        return False, value
+    try:
+        parsed = float(value)
+    except TypeError, ValueError:
+        return False, value
+    if parsed.is_integer():
+        return True, int(parsed)
+    return True, parsed
+
+
+def is_number_or_list(
+    value: Any, min_value: float | None = None, max_value: float | None = None
+) -> tuple[bool, Any]:
+    """Validate and normalize a number or two-item numeric range."""
+    if value is None:
+        return True, value
+    is_number_check, number_value = is_number(value)
+    if is_number_check:
+        if (min_value is None or number_value >= min_value) and (
+            max_value is None or number_value <= max_value
+        ):
+            return True, number_value
+        return False, value
+    if isinstance(value, str):
+        value = value.strip()
+        if value.startswith("[") and value.endswith("]") and value.count(",") == 1:
+            value = _strlist_to_list(value)
+        else:
+            return False, value
+    if isinstance(value, list) and len(value) == 2:
+        is_first, first = is_number(value[0])
+        is_second, second = is_number(value[1])
+        if not (is_first and is_second):
+            return False, value
+        normalized = [min(first, second), max(first, second)]
+        if (min_value is None or min(normalized) >= min_value) and (
+            max_value is None or max(normalized) <= max_value
+        ):
+            if normalized[0] == normalized[1]:
+                return True, normalized[0]
+            return True, normalized
+    return False, value
+
+
 def is_int_list_or_all(
     value: Any, min_value: int | None = None, max_value: int | None = None
 ) -> tuple[bool, Any]:
@@ -315,14 +362,14 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
         change_value, len(normalized.get(CONF_LIGHTS, []))
     )
 
-    transition_ok, transition_value = is_int_or_list(
+    transition_ok, transition_value = is_number_or_list(
         normalized.get(CONF_TRANSITION), TRANSITION_MIN, TRANSITION_MAX
     )
     if not transition_ok:
         raise vol.Invalid(ERROR_TRANSITION_NOT_INT_OR_RANGE)
     normalized[CONF_TRANSITION] = transition_value
 
-    frequency_ok, frequency_value = is_int_or_list(
+    frequency_ok, frequency_value = is_number_or_list(
         normalized.get(CONF_CHANGE_FREQUENCY), CHANGE_FREQUENCY_MIN, CHANGE_FREQUENCY_MAX
     )
     if not frequency_ok:

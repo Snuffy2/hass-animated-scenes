@@ -80,6 +80,21 @@ def test_normalize_scene_input_preserves_config_flow_metadata() -> None:
     assert result["color_selector_mode"] == "color_rgb_ui"
 
 
+def test_normalize_scene_input_accepts_fractional_runtime_timings() -> None:
+    """Allow UI-entered timings that the start service schema already accepts."""
+    data = _base_input()
+    data["transition"] = "0.5"
+    data["change_frequency"] = "[0.25, 1.5]"
+
+    result = normalize_scene_input(data)
+    service_result = validate_start_service_data(result)
+
+    assert result["transition"] == 0.5
+    assert result["change_frequency"] == [0.25, 1.5]
+    assert service_result["transition"] == 0.5
+    assert service_result["change_frequency"] == [0.25, 1.5]
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
