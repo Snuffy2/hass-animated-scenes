@@ -14,11 +14,16 @@ from custom_components.animated_scenes.config_flow import AnimatedScenesOptionsF
 from custom_components.animated_scenes.const import (
     COLOR_SELECTOR_RGB_UI,
     COLOR_SELECTOR_YAML,
+    CONF_COLOR,
+    CONF_COLOR_NEARBY_COLORS,
     CONF_COLOR_RGB_DICT,
     CONF_COLOR_SELECTOR_MODE,
+    CONF_COLOR_WEIGHT,
     CONF_COLORS,
     CONF_ENTITY_TYPE,
     CONF_TRANSITION,
+    DEFAULT_COLOR_NEARBY_COLORS,
+    DEFAULT_COLOR_WEIGHT,
     DOMAIN,
     ENTITY_SCENE,
     ERROR_COLORS_IS_BLANK,
@@ -87,6 +92,36 @@ async def test_options_scene_form_exposes_name_for_rename(hass: HomeAssistant) -
 
     assert result["type"] == "form"
     assert _schema_has_key(result["data_schema"], CONF_NAME)
+
+
+async def test_options_rgb_ui_defaults_missing_optional_color_values(
+    hass: HomeAssistant,
+) -> None:
+    """Apply optional RGB UI color defaults before rounding submitted values."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Spooky",
+        data={
+            CONF_NAME: "Spooky",
+            CONF_ENTITY_TYPE: ENTITY_SCENE,
+            CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_RGB_UI,
+            CONF_COLOR_RGB_DICT: {},
+            CONF_LIGHTS: ["light.one"],
+            CONF_TRANSITION: 1,
+        },
+        entry_id="spooky",
+    )
+    entry.add_to_hass(hass)
+    flow = AnimatedScenesOptionsFlowHandler(entry)
+    flow.hass = hass
+
+    with patch.object(hass.config_entries, "async_reload", AsyncMock()):
+        result = await flow.async_step_color_rgb_ui({CONF_COLOR: [255, 0, 0]})
+
+    assert result["type"] == "create_entry"
+    color_data = next(iter(entry.data[CONF_COLOR_RGB_DICT].values()))
+    assert color_data[CONF_COLOR_WEIGHT] == DEFAULT_COLOR_WEIGHT
+    assert color_data[CONF_COLOR_NEARBY_COLORS] == DEFAULT_COLOR_NEARBY_COLORS
 
 
 async def test_options_rename_stops_previous_animation_before_reload(

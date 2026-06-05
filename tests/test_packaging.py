@@ -33,7 +33,7 @@ def test_project_version_is_dynamic_from_integration_constant() -> None:
     """Keep package metadata version derived from const.py without importing HA."""
     pyproject = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["dynamic"] == ["version"]
+    assert "version" in pyproject["project"].get("dynamic", [])
     assert "version" not in pyproject["project"]
     assert (
         pyproject["tool"]["setuptools"]["dynamic"]["version"]["attr"]

@@ -2,7 +2,7 @@ name: Update Version and Create Zip on Release
 on:
   workflow_dispatch:
   release:
-    types: [published, edited]
+    types: [published]
 
 jobs:
   update_version_and_create_zip:
@@ -59,9 +59,11 @@ jobs:
 
       - name: Update Release with Version Changes Commit
         if: ${{ github.event_name == 'release' && github.event.release.draft == false && github.event.release.prerelease == false  }}
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          git tag -f ${{ github.event.release.tag_name }}
-          git push -f origin ${{ github.event.release.tag_name }}
+          git tag -f -- "$RELEASE_TAG"
+          git push -f origin "refs/tags/$RELEASE_TAG"
 
       - name: Create Zip
         run: |

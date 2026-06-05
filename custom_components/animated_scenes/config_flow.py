@@ -686,9 +686,15 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                 color_data.update({CONF_BRIGHTNESS: brightness_value})
             else:
                 errors["base"] = ERROR_BRIGHTNESS_NOT_INT_OR_RANGE
-            color_data.update({CONF_COLOR_WEIGHT: round(color_data.get(CONF_COLOR_WEIGHT))})
             color_data.update(
-                {CONF_COLOR_NEARBY_COLORS: round(color_data.get(CONF_COLOR_NEARBY_COLORS))}
+                {CONF_COLOR_WEIGHT: round(color_data.get(CONF_COLOR_WEIGHT, DEFAULT_COLOR_WEIGHT))}
+            )
+            color_data.update(
+                {
+                    CONF_COLOR_NEARBY_COLORS: round(
+                        color_data.get(CONF_COLOR_NEARBY_COLORS, DEFAULT_COLOR_NEARBY_COLORS)
+                    )
+                }
             )
             for k, v in defaults.items():
                 color_data.setdefault(k, v)
