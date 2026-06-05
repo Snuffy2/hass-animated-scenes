@@ -30,6 +30,7 @@ from .const import (
     CHANGE_FREQUENCY_MIN,
     CONF_ANIMATE_BRIGHTNESS,
     CONF_ANIMATE_COLOR,
+    CONF_ANIMATED_SCENE_SWITCH,
     CONF_CHANGE_AMOUNT,
     CONF_CHANGE_FREQUENCY,
     CONF_CHANGE_SEQUENCE,
@@ -46,6 +47,7 @@ from .const import (
     CONF_PRIORITY,
     CONF_RESTORE,
     CONF_RESTORE_POWER,
+    CONF_SKIP_RESTORE,
     CONF_TRANSITION,
     DEFAULT_ANIMATE_BRIGHTNESS,
     DEFAULT_ANIMATE_COLOR,
@@ -64,6 +66,7 @@ from .const import (
     ERROR_BRIGHTNESS_NOT_INT_OR_RANGE,
     ERROR_CHANGE_AMOUNT_NOT_INT_OR_ALL,
     ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE,
+    ERROR_MUST_SELECT_LIGHTS,
     ERROR_TRANSITION_NOT_INT_OR_RANGE,
     TRANSITION_MAX,
     TRANSITION_MIN,
@@ -202,13 +205,13 @@ ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_LIGHTS): cv.entity_ids,
         vol.Optional(CONF_NAME): cv.string,
-        vol.Optional("animated_scene_switch"): cv.entity_id,
+        vol.Optional(CONF_ANIMATED_SCENE_SWITCH): cv.entity_id,
     }
 )
 REMOVE_LIGHTS_SERVICE_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_LIGHTS): cv.entity_ids,
-        vol.Optional("skip_restore", default=False): bool,
+        vol.Optional(CONF_SKIP_RESTORE, default=False): bool,
     }
 )
 
@@ -305,7 +308,7 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
         normalized.setdefault(key, default)
 
     if len(normalized.get(CONF_LIGHTS, [])) == 0:
-        raise vol.Invalid("must_select_lights")
+        raise vol.Invalid(ERROR_MUST_SELECT_LIGHTS)
 
     change_ok, change_value = is_int_list_or_all(
         normalized.get(CONF_CHANGE_AMOUNT), CHANGE_AMOUNT_MIN, CHANGE_AMOUNT_MAX
@@ -337,7 +340,7 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
         raise vol.Invalid(ERROR_BRIGHTNESS_NOT_INT_OR_RANGE)
     normalized[CONF_BRIGHTNESS] = brightness_value
     normalized[CONF_PRIORITY] = round(normalized.get(CONF_PRIORITY, DEFAULT_PRIORITY))
-    return validate_start_service_data(normalized)
+    return normalized
 
 
 def clean_color_rgb_dict(color_rgb_dict: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:

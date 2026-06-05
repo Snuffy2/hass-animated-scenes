@@ -8,7 +8,9 @@ import voluptuous as vol
 from custom_components.animated_scenes.const import (
     CONF_CHANGE_AMOUNT,
     CONF_COLOR_RGB,
+    CONF_COLOR_RGB_DICT,
     CONF_COLORS,
+    CONF_ENTITY_TYPE,
     DEFAULT_ANIMATE_BRIGHTNESS,
     DEFAULT_ANIMATE_COLOR,
     DEFAULT_CHANGE_SEQUENCE,
@@ -58,6 +60,26 @@ def test_normalize_scene_input_adds_defaults() -> None:
     assert result["restore_power"] is DEFAULT_RESTORE_POWER
 
 
+def test_normalize_scene_input_preserves_config_flow_metadata() -> None:
+    """Allow config-flow-only fields to pass through shared normalization."""
+    data = _base_input()
+    data.update(
+        {
+            CONF_ENTITY_TYPE: "scene",
+            CONF_COLOR_RGB_DICT: {},
+            "icon": "mdi:palette",
+            "color_selector_mode": "color_rgb_ui",
+        }
+    )
+
+    result = normalize_scene_input(data)
+
+    assert result[CONF_ENTITY_TYPE] == "scene"
+    assert result[CONF_COLOR_RGB_DICT] == {}
+    assert result["icon"] == "mdi:palette"
+    assert result["color_selector_mode"] == "color_rgb_ui"
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
@@ -84,6 +106,24 @@ def test_validate_start_service_data_accepts_normalized_scene_data() -> None:
 
     assert result[CONF_NAME] == "Spooky"
     assert result[CONF_CHANGE_AMOUNT] == "all"
+
+
+def test_validate_start_service_data_rejects_config_flow_metadata() -> None:
+    """Keep runtime service validation strict even when config normalization is permissive."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_ENTITY_TYPE] = "scene"
+
+    with pytest.raises(vol.Invalid, match="extra keys not allowed"):
+        validate_start_service_data(data)
+
+
+def test_validate_start_service_data_rejects_malformed_colors() -> None:
+    """Reject malformed service color payloads before animation startup."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_COLORS] = [{"color_type": "rgb_color", "color": [255, 0]}]
+
+    with pytest.raises(vol.Invalid):
+        validate_start_service_data(data)
 
 
 def test_build_colors_from_rgb_dict_converts_to_color_list() -> None:
