@@ -28,7 +28,6 @@ from homeassistant.components.light import (
     ATTR_RGBWW_COLOR,
     ATTR_XY_COLOR,
     DOMAIN as LIGHT_DOMAIN,
-    VALID_TRANSITION,
     ColorMode,
 )
 from homeassistant.const import (
@@ -41,7 +40,6 @@ from homeassistant.const import (
 )
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State
 from homeassistant.exceptions import IntegrationError
-import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util.color import (
     color_hs_to_RGB,
@@ -81,136 +79,14 @@ from .const import (
     MAX_KELVIN,
     MIN_KELVIN,
 )
+from .scene_config import (
+    ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA,
+    REMOVE_LIGHTS_SERVICE_SCHEMA,
+    START_SERVICE_SCHEMA,
+    STOP_SERVICE_SCHEMA,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
-
-COLOR_GROUP_SCHEMA = {
-    vol.Optional(CONF_BRIGHTNESS, default=255): vol.Any(
-        vol.Range(min=0, max=255), vol.All([vol.Range(min=0, max=255)])
-    ),
-    vol.Optional(CONF_COLOR_WEIGHT, default=10): vol.Range(min=0, max=255),
-    vol.Optional(CONF_COLOR_ONE_CHANGE_PER_TICK, default=False): bool,
-    # Nearby-colors modifier: 0 disables, 1-10 controls magnitude of change
-    vol.Optional(CONF_COLOR_NEARBY_COLORS, default=0): vol.Range(min=0, max=10),
-}
-
-START_SERVICE_CONFIG = {
-    vol.Required(CONF_NAME): cv.string,
-    vol.Optional(CONF_IGNORE_OFF, default=True): bool,
-    vol.Optional(CONF_RESTORE, default=True): bool,
-    vol.Optional(CONF_RESTORE_POWER, default=True): bool,
-    vol.Optional(CONF_BRIGHTNESS, default=255): vol.Any(
-        vol.Range(min=0, max=255), vol.All([vol.Range(min=0, max=255)])
-    ),
-    vol.Optional(CONF_TRANSITION, default=1.0): vol.Any(
-        VALID_TRANSITION, vol.All([VALID_TRANSITION])
-    ),
-    vol.Optional(CONF_CHANGE_FREQUENCY): vol.Any(
-        vol.Coerce(float),
-        vol.Range(min=0, max=60),
-        vol.All([vol.Coerce(float), vol.Range(min=0, max=60)]),
-    ),
-    vol.Optional(CONF_CHANGE_AMOUNT, default=1): vol.Any(
-        "all",
-        vol.All(vol.Coerce(int), vol.Range(min=0, max=65535)),
-        vol.All(vol.All([vol.Coerce(int), vol.Range(min=0, max=65535)])),
-    ),
-    vol.Optional(CONF_CHANGE_SEQUENCE, default=False): bool,
-    vol.Optional(CONF_ANIMATE_BRIGHTNESS, default=True): bool,
-    vol.Optional(CONF_ANIMATE_COLOR, default=True): bool,
-    vol.Optional(CONF_PRIORITY, default=100): int,
-    vol.Required(CONF_LIGHTS): cv.entity_ids,
-    vol.Optional(CONF_COLORS, default=[]): vol.All(
-        cv.ensure_list,
-        [
-            vol.Any(
-                vol.Schema(
-                    {
-                        vol.Required(CONF_COLOR_TYPE): ATTR_RGB_COLOR,
-                        vol.Required(CONF_COLOR): vol.All(
-                            vol.Coerce(tuple), vol.ExactSequence((cv.byte,) * 3)
-                        ),
-                    }
-                ).extend(COLOR_GROUP_SCHEMA),
-                vol.Schema(
-                    {
-                        vol.Required(CONF_COLOR_TYPE): ATTR_RGBW_COLOR,
-                        vol.Required(CONF_COLOR): vol.All(
-                            vol.Coerce(tuple), vol.ExactSequence((cv.byte,) * 4)
-                        ),
-                    }
-                ).extend(COLOR_GROUP_SCHEMA),
-                vol.Schema(
-                    {
-                        vol.Required(CONF_COLOR_TYPE): ATTR_RGBWW_COLOR,
-                        vol.Required(CONF_COLOR): vol.All(
-                            vol.Coerce(tuple), vol.ExactSequence((cv.byte,) * 5)
-                        ),
-                    }
-                ).extend(COLOR_GROUP_SCHEMA),
-                vol.Schema(
-                    {
-                        vol.Required(CONF_COLOR_TYPE): ATTR_XY_COLOR,
-                        vol.Required(CONF_COLOR): vol.All(
-                            vol.Coerce(tuple),
-                            vol.ExactSequence((cv.small_float, cv.small_float)),
-                        ),
-                    }
-                ).extend(COLOR_GROUP_SCHEMA),
-                vol.Schema(
-                    {
-                        vol.Required(CONF_COLOR_TYPE): ATTR_HS_COLOR,
-                        vol.Required(CONF_COLOR): vol.All(
-                            vol.Coerce(tuple),
-                            vol.ExactSequence(
-                                (
-                                    vol.All(vol.Coerce(float), vol.Range(min=0, max=360)),
-                                    vol.All(vol.Coerce(float), vol.Range(min=0, max=100)),
-                                )
-                            ),
-                        ),
-                    }
-                ).extend(COLOR_GROUP_SCHEMA),
-                vol.Schema(
-                    {
-                        vol.Required(CONF_COLOR_TYPE): ATTR_COLOR_TEMP,
-                        vol.Required(CONF_COLOR): vol.All(vol.Coerce(int), vol.Range(min=1)),
-                    }
-                ).extend(COLOR_GROUP_SCHEMA),
-                vol.Schema(
-                    {
-                        vol.Required(CONF_COLOR_TYPE): ATTR_COLOR_TEMP_KELVIN,
-                        vol.Required(CONF_COLOR): cv.positive_int,
-                    }
-                ).extend(COLOR_GROUP_SCHEMA),
-            )
-        ],
-    ),
-}
-
-START_SERVICE_SCHEMA = vol.Schema(START_SERVICE_CONFIG)
-
-STOP_SERVICE_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_NAME): cv.string,
-    }
-)
-
-ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_LIGHTS): cv.entity_ids,
-        vol.Optional(CONF_NAME): cv.string,
-        vol.Optional(CONF_ANIMATED_SCENE_SWITCH): cv.entity_id,
-    }
-)
-
-
-REMOVE_LIGHTS_SERVICE_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_LIGHTS): cv.entity_ids,
-        vol.Optional(CONF_SKIP_RESTORE, default=False): bool,
-    }
-)
 
 
 def _convert_mireds_to_kelvin(mireds: int) -> int:

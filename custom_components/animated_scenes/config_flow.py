@@ -5,9 +5,7 @@ Assistant to configure Animated Scenes. It includes small helper
 functions used to parse and validate user input from the UI.
 """
 
-import copy
 import logging
-from numbers import Number
 from typing import Any
 
 import voluptuous as vol
@@ -24,10 +22,6 @@ from .const import (
     ABORT_INTEGRATION_NO_OPTIONS,
     BRIGHTNESS_MAX,
     BRIGHTNESS_MIN,
-    CHANGE_AMOUNT_MAX,
-    CHANGE_AMOUNT_MIN,
-    CHANGE_FREQUENCY_MAX,
-    CHANGE_FREQUENCY_MIN,
     COLOR_SELECTOR_RGB_UI,
     COLOR_SELECTOR_YAML,
     COMPONENT_COLOR_CONFIG_URL,
@@ -72,192 +66,22 @@ from .const import (
     ENTITY_ACTIVITY_SENSOR,
     ENTITY_SCENE,
     ERROR_BRIGHTNESS_NOT_INT_OR_RANGE,
-    ERROR_CHANGE_AMOUNT_NOT_INT_OR_ALL,
-    ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE,
     ERROR_COLORS_IS_BLANK,
     ERROR_COLORS_MALFORMED,
-    ERROR_MUST_SELECT_LIGHTS,
-    ERROR_TRANSITION_NOT_INT_OR_RANGE,
-    TRANSITION_MAX,
-    TRANSITION_MIN,
+)
+
+from .scene_config import (
+    clean_color_rgb_dict,
+    is_int_or_list,
+    list_or_int_to_str,
+    normalize_scene_input,
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
-
 COLOR_SELECTOR_OPTION_LIST = [
     selector.SelectOptionDict(label="Use RGB Selectors", value=COLOR_SELECTOR_RGB_UI),
     selector.SelectOptionDict(label="Configure via YAML", value=COLOR_SELECTOR_YAML),
 ]
-
-
-def _if_list_or_int_to_str(invar: Any) -> Any:
-    """Return a string representation for an int or a 2-item list.
-
-    If ``invar`` is a list it is converted to a bracketed comma-separated
-    string. If it represents an integer (or numeric string) the string
-    form of the integer is returned. Other values are returned
-    unchanged.
-    """
-    # _LOGGER.debug(f"[if_list_or_int_to_str] starting input: {invar}, type: {type(invar)}")
-    if isinstance(invar, list):
-        strlist: str = "[" + ", ".join(str(n) for n in invar) + "]"
-        # _LOGGER.debug(f"[if_list_or_int_to_str] input: {invar}, strlist: {strlist}")
-        return strlist
-    is_int_check, is_int_value = _is_int(invar)
-    if is_int_check:
-        # _LOGGER.debug(f"[if_list_or_int_to_str] input: {invar}, strint: {str(is_int_value)}")
-        return str(is_int_value)
-    # _LOGGER.debug(f"[if_list_or_int_to_str] input: {invar}, type: {type(invar)}")
-    return invar
-
-
-def _strlist_to_list(invar: str) -> list[str]:
-    """Convert a bracketed comma-separated string to a two-item list.
-
-    Example: the string "[1, 2]" becomes ["1", " 2"]. This helper
-    does not coerce element types.
-    """
-    return invar.strip("][").split(",")
-
-
-def _is_int(invar: Any) -> tuple[bool, Any]:
-    """Return (True, int) if value can be interpreted as an integer.
-
-    Accepts numeric types and numeric strings. If the input is an
-    integer-like numeric value the returned tuple is (True, int(value)).
-    Otherwise (False, original_value) is returned.
-    """
-    # _LOGGER.debug(f"[is_int] starting input: {invar}, type: {type(invar)}")
-    if invar is None or not isinstance(invar, Number | str):
-        return False, invar
-    try:
-        value = float(invar)
-    except (TypeError, ValueError):
-        return False, invar
-    if value.is_integer():
-        return True, int(value)
-    return False, invar
-
-
-def _is_int_or_list(
-    invar: Any, minvar: int | None = None, maxvar: int | None = None
-) -> tuple[bool, Any]:
-    """Validate an input as either an int or a two-item int list.
-
-    Returns (True, coerced_value) on success where coerced_value is an
-    int or a normalized two-item list. Returns (False, original) on
-    failure.
-    """
-    # _LOGGER.debug(f"[is_int_or_list] starting input: {invar}, type: {type(invar)}")
-    if invar is None:
-        # _LOGGER.debug(f"[is_int_or_list] input is None: {invar} (True)")
-        return True, invar
-    is_int_check, is_int_value = _is_int(invar)
-    if is_int_check:
-        if (minvar is None or is_int_value >= minvar) and (
-            maxvar is None or is_int_value <= maxvar
-        ):
-            # _LOGGER.debug(f"[is_int_or_list] input is int in range: {invar} [{minvar}, {maxvar}] (True)")
-            return True, is_int_value
-        # _LOGGER.debug(f"[is_int_or_list] input is int but NOT in range: {invar} [{minvar}, {maxvar}] (False)")
-        return False, invar
-    if isinstance(invar, str):
-        invar = invar.strip()
-        if invar.startswith("[") and invar.endswith("]") and invar.count(",") == 1:
-            # _LOGGER.debug(f"[is_int_or_list] input is a 2 item string list, converting to list: {invar}")
-            invar = _strlist_to_list(invar)
-        else:
-            # _LOGGER.debug(f"[is_int_or_list] input is a string but is not a 2 item list: {invar} (False)")
-            return False, invar
-
-    if isinstance(invar, list):
-        if len(invar) == 2:
-            is_int0_check, is_int0_value = _is_int(invar[0])
-            is_int1_check, is_int1_value = _is_int(invar[1])
-            if not (is_int0_check and is_int1_check):
-                # _LOGGER.debug(f"[is_int_or_list] input is a 2 item list, but 2 items aren't integers: {invar} (False)")
-                return False, invar
-            if is_int0_value > is_int1_value:
-                invar = [is_int1_value, is_int0_value]
-            else:
-                invar = [is_int0_value, is_int1_value]
-            if (minvar is None or (invar[0] >= minvar and invar[1] >= minvar)) and (
-                maxvar is None or (invar[0] <= maxvar and invar[1] <= maxvar)
-            ):
-                if invar[0] == invar[1]:
-                    # _LOGGER.debug(f"[is_int_or_list] input is int in range: {invar} [{minvar}, {maxvar}] (True)")
-                    return True, invar[0]
-                # _LOGGER.debug(f"[is_int_or_list] input is a 2 int list within min, max: {invar} [{minvar}, {maxvar}] (True)")
-                return True, invar
-            # _LOGGER.debug(f"[is_int_or_list] input is a 2 item list, but not within min, max: {invar} [{minvar}, {maxvar}] (False)")
-            return False, invar
-        # _LOGGER.debug(f"[is_int_or_list] input is a list, but doesn't have 2 items: {invar} (False)")
-        return False, invar
-    # _LOGGER.debug(f"[is_int_or_list] input does not meet any criteria: {invar}, type: {type(invar)} (False)")
-    return False, invar
-
-
-def _is_int_list_or_all(
-    invar: Any, minvar: int | None = None, maxvar: int | None = None
-) -> tuple[bool, Any]:
-    """Validate input as an int/list or the literal 'all'.
-
-    Accepts None, integers, two-item integer lists, or the string
-    "all". Returns (True, coerced_value) when input is acceptable.
-    """
-    # _LOGGER.debug(f"[is_int_list_or_all] starting input: {invar}, type: {type(invar)}")
-    if invar is None:
-        # _LOGGER.debug(f"[is_int_list_or_all] input is None: {invar} (True)")
-        return True, invar
-    is_int_or_list_check, is_int_or_list_value = _is_int_or_list(invar, minvar, maxvar)
-    if is_int_or_list_check:
-        # _LOGGER.debug(f"[is_int_list_or_all] input is valid int or list: {is_int_or_list_value} (True)")
-        return True, is_int_or_list_value
-    if isinstance(invar, str):
-        invar = invar.strip()
-    if invar == "all":
-        # _LOGGER.debug(f"[is_int_list_or_all] input is 'all': {invar} (True)")
-        return True, invar
-    # _LOGGER.debug(f"[is_int_list_or_all] input does not meet any criteria: {invar}, type: {type(invar)} (False)")
-    return False, invar
-
-
-def _overrride_max_change_amount(invar: Any, light_count: int) -> Any:
-    """Adjust change-amount values to account for the available lights.
-
-    If a fixed integer exceeds the number of available lights, returns
-    the string "all". If a two-item range exceeds the number of lights,
-    the upper bound will be clamped.
-    """
-    _LOGGER.debug("[overrride_max_change_amount] input: %s, light_count: %s", invar, light_count)
-    if isinstance(invar, int) and invar > light_count:
-        # _LOGGER.debug("[overrride_max_change_amount] return: 'all'")
-        return "all"
-    if isinstance(invar, list) and invar[1] > light_count:
-        if invar[0] >= light_count:
-            # _LOGGER.debug("[overrride_max_change_amount] return: 'all'")
-            return "all"
-        invar[1] = light_count
-    # _LOGGER.debug(f"[overrride_max_change_amount] return: {invar}")
-    return invar
-
-
-def _clean_color_rgb_dict(color_rgb_dict: dict) -> dict:
-    """Remove UI-only helper keys from the RGB color dictionary.
-
-    The UI keeps temporary keys such as add/delete flags in the color
-    dict; this function removes those keys before the structure is
-    persisted to the integration configuration.
-    """
-    _LOGGER.debug("[clean_color_rgb_dict] initial color_rgb_dict: %s", color_rgb_dict)
-    for key, color in copy.deepcopy(color_rgb_dict).items():
-        color_rgb_dict[key].pop(CONF_COLOR_ADD_COLOR, None)
-        if color.get(CONF_COLOR_DELETE_COLOR, False):
-            color_rgb_dict.pop(key, None)
-        else:
-            color_rgb_dict[key].pop(CONF_COLOR_DELETE_COLOR, None)
-    _LOGGER.debug("[clean_color_rgb_dict] final color_rgb_dict: %s", color_rgb_dict)
-    return color_rgb_dict
 
 
 async def _async_build_schema(
@@ -299,23 +123,23 @@ async def _async_build_schema(
             ),
             vol.Optional(
                 CONF_CHANGE_FREQUENCY,
-                default=_if_list_or_int_to_str(
+                default=list_or_int_to_str(
                     _get_default(CONF_CHANGE_FREQUENCY, DEFAULT_CHANGE_FREQUENCY)
                 ),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_TRANSITION,
-                default=_if_list_or_int_to_str(_get_default(CONF_TRANSITION, DEFAULT_TRANSITION)),
+                default=list_or_int_to_str(_get_default(CONF_TRANSITION, DEFAULT_TRANSITION)),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_CHANGE_AMOUNT,
-                default=_if_list_or_int_to_str(
+                default=list_or_int_to_str(
                     _get_default(CONF_CHANGE_AMOUNT, DEFAULT_CHANGE_AMOUNT)
                 ),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_BRIGHTNESS,
-                default=_if_list_or_int_to_str(_get_default(CONF_BRIGHTNESS, DEFAULT_BRIGHTNESS)),
+                default=list_or_int_to_str(_get_default(CONF_BRIGHTNESS, DEFAULT_BRIGHTNESS)),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_CHANGE_SEQUENCE,
@@ -416,7 +240,7 @@ async def _async_build_color_rgb_ui_schema(
             ),
             vol.Optional(
                 CONF_BRIGHTNESS,
-                default=_if_list_or_int_to_str(_get_default(CONF_BRIGHTNESS, DEFAULT_BRIGHTNESS)),
+                default=list_or_int_to_str(_get_default(CONF_BRIGHTNESS, DEFAULT_BRIGHTNESS)),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_COLOR_WEIGHT,
@@ -541,75 +365,10 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data.update(user_input)
             self._data.update({CONF_ENTITY_TYPE: ENTITY_SCENE})
-            _LOGGER.debug(
-                "Checking Change Amount: %s, type: %s",
-                self._data.get(CONF_CHANGE_AMOUNT),
-                type(self._data.get(CONF_CHANGE_AMOUNT)),
-            )
-            if len(self._data.get(CONF_LIGHTS, [])) == 0:
-                errors["base"] = ERROR_MUST_SELECT_LIGHTS
-            change_amount_check, change_amount_value = _is_int_list_or_all(
-                self._data.get(CONF_CHANGE_AMOUNT),
-                CHANGE_AMOUNT_MIN,
-                CHANGE_AMOUNT_MAX,
-            )
-            if change_amount_check:
-                self._data.update({CONF_CHANGE_AMOUNT: change_amount_value})
-            else:
-                errors["base"] = ERROR_CHANGE_AMOUNT_NOT_INT_OR_ALL
-            _LOGGER.debug(
-                "Checking Transition: %s, type: %s",
-                self._data.get(CONF_TRANSITION),
-                type(self._data.get(CONF_TRANSITION)),
-            )
-            transition_check, transition_value = _is_int_or_list(
-                self._data.get(CONF_TRANSITION),
-                TRANSITION_MIN,
-                TRANSITION_MAX,
-            )
-            if transition_check:
-                self._data.update({CONF_TRANSITION: transition_value})
-            else:
-                errors["base"] = ERROR_TRANSITION_NOT_INT_OR_RANGE
-            _LOGGER.debug(
-                "Checking Change Frequency: %s, type: %s",
-                self._data.get(CONF_CHANGE_FREQUENCY),
-                type(self._data.get(CONF_CHANGE_FREQUENCY)),
-            )
-            change_frequency_check, change_frequency_value = _is_int_or_list(
-                self._data.get(CONF_CHANGE_FREQUENCY),
-                CHANGE_FREQUENCY_MIN,
-                CHANGE_FREQUENCY_MAX,
-            )
-            if change_frequency_check:
-                self._data.update({CONF_CHANGE_FREQUENCY: change_frequency_value})
-            else:
-                errors["base"] = ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE
-            _LOGGER.debug(
-                "Checking Brightness: %s, type: %s",
-                self._data.get(CONF_BRIGHTNESS),
-                type(self._data.get(CONF_BRIGHTNESS)),
-            )
-            brightness_check, brightness_value = _is_int_or_list(
-                self._data.get(CONF_BRIGHTNESS),
-                BRIGHTNESS_MIN,
-                BRIGHTNESS_MAX,
-            )
-            if brightness_check:
-                self._data.update({CONF_BRIGHTNESS: brightness_value})
-            else:
-                errors["base"] = ERROR_BRIGHTNESS_NOT_INT_OR_RANGE
-            self._data.update(
-                {CONF_PRIORITY: round(self._data.get(CONF_PRIORITY, DEFAULT_PRIORITY))}
-            )
-            self._data.update(
-                {
-                    CONF_CHANGE_AMOUNT: _overrride_max_change_amount(
-                        self._data.get(CONF_CHANGE_AMOUNT),
-                        len(self._data.get(CONF_LIGHTS, [])),
-                    )
-                }
-            )
+            try:
+                self._data = normalize_scene_input(self._data)
+            except vol.Invalid as err:
+                errors["base"] = str(err)
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
             # _LOGGER.debug(f"[async_step_scene] self._data: {self._data}")
@@ -681,7 +440,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
                 user_input.get(CONF_BRIGHTNESS),
                 type(user_input.get(CONF_BRIGHTNESS)),
             )
-            brightness_check, brightness_value = _is_int_or_list(
+            brightness_check, brightness_value = is_int_or_list(
                 user_input.get(CONF_BRIGHTNESS),
                 BRIGHTNESS_MIN,
                 BRIGHTNESS_MAX,
@@ -710,7 +469,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
                     return await self.async_step_color_rgb_ui()
                 self._data.update(
                     {
-                        CONF_COLOR_RGB_DICT: _clean_color_rgb_dict(
+                        CONF_COLOR_RGB_DICT: clean_color_rgb_dict(
                             self._data.get(CONF_COLOR_RGB_DICT, {})
                         )
                     }
@@ -794,75 +553,10 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             self._data.update(user_input)
             self._data.update({CONF_ENTITY_TYPE: ENTITY_SCENE})
-            _LOGGER.debug(
-                "Checking Change Amount: %s, type: %s",
-                self._data.get(CONF_CHANGE_AMOUNT),
-                type(self._data.get(CONF_CHANGE_AMOUNT)),
-            )
-            if len(self._data.get(CONF_LIGHTS, [])) == 0:
-                errors["base"] = ERROR_MUST_SELECT_LIGHTS
-            change_amount_check, change_amount_value = _is_int_list_or_all(
-                self._data.get(CONF_CHANGE_AMOUNT),
-                CHANGE_AMOUNT_MIN,
-                CHANGE_AMOUNT_MAX,
-            )
-            if change_amount_check:
-                self._data.update({CONF_CHANGE_AMOUNT: change_amount_value})
-            else:
-                errors["base"] = ERROR_CHANGE_AMOUNT_NOT_INT_OR_ALL
-            _LOGGER.debug(
-                "Checking Transition: %s, type: %s",
-                self._data.get(CONF_TRANSITION),
-                type(self._data.get(CONF_TRANSITION)),
-            )
-            transition_check, transition_value = _is_int_or_list(
-                self._data.get(CONF_TRANSITION),
-                TRANSITION_MIN,
-                TRANSITION_MAX,
-            )
-            if transition_check:
-                self._data.update({CONF_TRANSITION: transition_value})
-            else:
-                errors["base"] = ERROR_TRANSITION_NOT_INT_OR_RANGE
-            _LOGGER.debug(
-                "Checking Change Frequency: %s, type: %s",
-                self._data.get(CONF_CHANGE_FREQUENCY),
-                type(self._data.get(CONF_CHANGE_FREQUENCY)),
-            )
-            change_frequency_check, change_frequency_value = _is_int_or_list(
-                self._data.get(CONF_CHANGE_FREQUENCY),
-                CHANGE_FREQUENCY_MIN,
-                CHANGE_FREQUENCY_MAX,
-            )
-            if change_frequency_check:
-                self._data.update({CONF_CHANGE_FREQUENCY: change_frequency_value})
-            else:
-                errors["base"] = ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE
-            _LOGGER.debug(
-                "Checking Brightness: %s, type: %s",
-                self._data.get(CONF_BRIGHTNESS),
-                type(self._data.get(CONF_BRIGHTNESS)),
-            )
-            brightness_check, brightness_value = _is_int_or_list(
-                self._data.get(CONF_BRIGHTNESS),
-                BRIGHTNESS_MIN,
-                BRIGHTNESS_MAX,
-            )
-            if brightness_check:
-                self._data.update({CONF_BRIGHTNESS: brightness_value})
-            else:
-                errors["base"] = ERROR_BRIGHTNESS_NOT_INT_OR_RANGE
-            self._data.update(
-                {CONF_PRIORITY: round(self._data.get(CONF_PRIORITY, DEFAULT_PRIORITY))}
-            )
-            self._data.update(
-                {
-                    CONF_CHANGE_AMOUNT: _overrride_max_change_amount(
-                        self._data.get(CONF_CHANGE_AMOUNT),
-                        len(self._data.get(CONF_LIGHTS, [])),
-                    )
-                }
-            )
+            try:
+                self._data = normalize_scene_input(self._data)
+            except vol.Invalid as err:
+                errors["base"] = str(err)
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
             # _LOGGER.debug(f"[async_init_user] self._data: {self._data}")
@@ -943,7 +637,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                 color_data.get(CONF_BRIGHTNESS),
                 type(color_data.get(CONF_BRIGHTNESS)),
             )
-            brightness_check, brightness_value = _is_int_or_list(
+            brightness_check, brightness_value = is_int_or_list(
                 color_data.get(CONF_BRIGHTNESS),
                 BRIGHTNESS_MIN,
                 BRIGHTNESS_MAX,
@@ -976,7 +670,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                 self._data.update({CONF_COLORS: {}})
                 self._data.update(
                     {
-                        CONF_COLOR_RGB_DICT: _clean_color_rgb_dict(
+                        CONF_COLOR_RGB_DICT: clean_color_rgb_dict(
                             self._data.get(CONF_COLOR_RGB_DICT, {})
                         )
                     }
