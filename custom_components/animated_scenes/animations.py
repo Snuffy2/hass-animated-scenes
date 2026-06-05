@@ -37,7 +37,7 @@ from homeassistant.const import (
     SERVICE_TURN_ON,
 )
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State
-from homeassistant.exceptions import IntegrationError
+from homeassistant.exceptions import HomeAssistantError, IntegrationError
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util.color import (
     color_hs_to_RGB,
@@ -105,9 +105,9 @@ async def safe_call(hass: HomeAssistant, domain: str, service: str, attr: dict) 
     """Call a Home Assistant service safely, logging exceptions.
 
     This wrapper calls the given service on the Home Assistant instance
-    and logs a warning if the call raises an exception. It intentionally
-    suppresses exceptions to avoid stopping animations when a service
-    call fails.
+    and logs a warning for Home Assistant service errors. It intentionally
+    suppresses those service-call failures to avoid stopping animations when
+    one light update fails.
 
     Args:
         hass: Home Assistant instance.
@@ -121,7 +121,7 @@ async def safe_call(hass: HomeAssistant, domain: str, service: str, attr: dict) 
     """
     try:
         await hass.services.async_call(domain, service, attr)
-    except Exception as e:  # noqa: BLE001
+    except HomeAssistantError as e:
         _LOGGER.warning("Received an error calling service. %s: %s", type(e).__name__, e)
 
 

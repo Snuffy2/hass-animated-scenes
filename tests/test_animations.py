@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-from types import MappingProxyType
+from types import MappingProxyType, SimpleNamespace
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import ConfigEntry, DiscoveryKey
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import IntegrationError
+from homeassistant.exceptions import HomeAssistantError, IntegrationError
 import pytest
 
 from custom_components.animated_scenes import async_setup, async_setup_entry, async_unload_entry
-from custom_components.animated_scenes.animations import Animation, Animations
+from custom_components.animated_scenes.animations import Animation, Animations, safe_call
 from custom_components.animated_scenes.const import (
     CONF_ENTITY_TYPE,
     CONF_LIGHTS,
@@ -114,6 +115,35 @@ async def test_services_register_with_schema(hass: HomeAssistant) -> None:
     assert registrations["stop_animation"].schema is STOP_SERVICE_SCHEMA
     assert registrations["remove_lights"].schema is REMOVE_LIGHTS_SERVICE_SCHEMA
     assert registrations["add_lights_to_animation"].schema is ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA
+
+
+@pytest.mark.asyncio
+async def test_safe_call_logs_home_assistant_service_errors() -> None:
+    """Keep animation ticks alive when a Home Assistant service call fails."""
+    fake_hass = cast(
+        "HomeAssistant",
+        SimpleNamespace(
+            services=SimpleNamespace(
+                async_call=AsyncMock(side_effect=HomeAssistantError("service failed"))
+            )
+        ),
+    )
+
+    await safe_call(fake_hass, "light", "turn_on", {"entity_id": "light.one"})
+
+
+@pytest.mark.asyncio
+async def test_safe_call_propagates_unexpected_runtime_errors() -> None:
+    """Expose non-Home Assistant errors instead of masking implementation bugs."""
+    fake_hass = cast(
+        "HomeAssistant",
+        SimpleNamespace(
+            services=SimpleNamespace(async_call=AsyncMock(side_effect=RuntimeError("bug")))
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="bug"):
+        await safe_call(fake_hass, "light", "turn_on", {"entity_id": "light.one"})
 
 
 @pytest.mark.asyncio
