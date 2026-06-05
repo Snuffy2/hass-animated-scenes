@@ -65,7 +65,7 @@ warn_unused_configs = true
 
 [[tool.mypy.overrides]]
 module = ["pytest_homeassistant_custom_component.*"]
-ignore_missing_imports = true
+follow_untyped_imports = true
 
 [tool.ruff]
 line-length = 100

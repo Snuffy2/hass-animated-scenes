@@ -51,6 +51,7 @@ args = ["--config-file=pyproject.toml"]
 additional_dependencies = [
   "homeassistant-stubs",
   "pytest",
+  "pytest-homeassistant-custom-component",
   "types-cffi",
   "types-PyMySQL",
   "types-pyRFC3339",

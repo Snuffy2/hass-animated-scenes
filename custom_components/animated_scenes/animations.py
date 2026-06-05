@@ -670,7 +670,7 @@ class Animation:
             randomized_list: list = sample(self._active_lights, k=change_amount)
             for light in randomized_list:
                 state = self._hass.states.get(light)
-                if state.state != "off":
+                if state is not None and state.state != "off":
                     to_change.append(light)
                 if len(to_change) >= change_amount:
                     return to_change
