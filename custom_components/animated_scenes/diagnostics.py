@@ -7,12 +7,15 @@ identifiers that could expose user-specific rooms, devices, or naming schemes.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .animations import Animations
+
+_LOGGER = logging.getLogger(__name__)
 
 TO_REDACT = {"animated_scene_switch", "entity_id", "lights", "name"}
 
@@ -52,12 +55,7 @@ async def async_get_config_entry_diagnostics(
         counts from the active animation manager.
 
     """
-    manager = Animations.instance
-    runtime = {
-        "active_animation_count": len(manager.animations) if manager else 0,
-        "active_light_count": len(manager.light_owner) if manager else 0,
-        "stored_state_count": len(manager.states) if manager else 0,
-    }
+    runtime = _runtime_diagnostics()
     return {
         "entry": {
             "title": "**REDACTED**",
@@ -65,4 +63,29 @@ async def async_get_config_entry_diagnostics(
             "options": _redact(dict(entry.options)),
         },
         "runtime": runtime,
+    }
+
+
+def _runtime_diagnostics() -> dict[str, int]:
+    """Return runtime animation counters, falling back to zeros on bad state."""
+    manager = Animations.instance
+    if manager is None:
+        return _zero_runtime_diagnostics()
+    try:
+        return {
+            "active_animation_count": len(manager.animations),
+            "active_light_count": len(manager.light_owner),
+            "stored_state_count": len(manager.states),
+        }
+    except (AttributeError, TypeError) as err:
+        _LOGGER.debug("Unable to collect Animated Scenes runtime diagnostics: %s", err)
+        return _zero_runtime_diagnostics()
+
+
+def _zero_runtime_diagnostics() -> dict[str, int]:
+    """Return zeroed runtime diagnostic counters."""
+    return {
+        "active_animation_count": 0,
+        "active_light_count": 0,
+        "stored_state_count": 0,
     }

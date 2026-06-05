@@ -1139,8 +1139,6 @@ class Animations:
             if light in self._light_animations and not self._light_animations[light]:
                 del self._light_animations[light]
         for animation in affected_animations:
-            self._fire_animation_updated(animation.name)
-        for animation in affected_animations:
             if len(animation.get_active_lights()) == 0:
                 await animation.stop()
             self.fire_animation_change(animation.name, EVENT_STATE_UPDATED)

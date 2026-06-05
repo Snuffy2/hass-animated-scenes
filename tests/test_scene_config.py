@@ -49,6 +49,18 @@ def test_normalize_scene_input_clamps_change_amount_to_all() -> None:
     assert result[CONF_CHANGE_AMOUNT] == "all"
 
 
+def test_normalize_scene_input_clamps_change_amount_range_without_mutating_input() -> None:
+    """Clamp oversized change_amount ranges without mutating caller data."""
+    data = _base_input()
+    change_amount = [1, 3]
+    data[CONF_CHANGE_AMOUNT] = change_amount
+
+    result = normalize_scene_input(data)
+
+    assert result[CONF_CHANGE_AMOUNT] == [1, 2]
+    assert change_amount == [1, 3]
+
+
 def test_normalize_scene_input_adds_defaults() -> None:
     """Add integration defaults exactly once in shared normalization."""
     result = normalize_scene_input(_base_input())

@@ -275,8 +275,16 @@ def list_or_int_to_str(value: Any) -> Any:
 
 
 def _strlist_to_list(value: str) -> list[str]:
-    """Convert a bracketed comma-separated string into a two-item list."""
-    return value.strip("][").split(",")
+    """Convert a bracketed comma-separated string into a trimmed item list.
+
+    Args:
+        value: A bracketed comma-separated string such as ``"[1, 2]"``.
+
+    Returns:
+        The trimmed list items between brackets. Malformed empty items are
+        preserved for the caller's typed validation to reject.
+    """
+    return [item.strip() for item in value.strip("][").split(",")]
 
 
 def is_int_or_list(
@@ -366,7 +374,7 @@ def override_max_change_amount(value: Any, light_count: int) -> Any:
     if isinstance(value, list) and value[1] > light_count:
         if value[0] >= light_count:
             return "all"
-        value[1] = light_count
+        return [value[0], light_count]
     return value
 
 

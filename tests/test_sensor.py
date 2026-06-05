@@ -16,8 +16,20 @@ from custom_components.animated_scenes.const import (
     ENTITY_ACTIVITY_SENSOR,
     EVENT_NAME_CHANGE,
     EVENT_STATE_STARTED,
+    INTEGRATION_NAME,
 )
 from custom_components.animated_scenes.sensor import AnimatedScenesSensor
+
+
+def test_sensor_exposes_animated_scenes_device_info(hass: HomeAssistant) -> None:
+    """Group activity sensor entities under the Animated Scenes device."""
+    sensor = AnimatedScenesSensor(hass)
+
+    assert sensor.device_info == {
+        "identifiers": {(DOMAIN, "animated_scenes")},
+        "name": INTEGRATION_NAME,
+        "manufacturer": INTEGRATION_NAME,
+    }
 
 
 @pytest.mark.asyncio

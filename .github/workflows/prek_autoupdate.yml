@@ -4,17 +4,22 @@ on:
     - cron: '0 2 * * 1'
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+concurrency:
+  group: prek-autoupdate-chore-prek-updates
+  cancel-in-progress: true
 
 jobs:
   update-hooks:
     name: Update prek Hooks
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v6

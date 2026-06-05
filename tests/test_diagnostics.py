@@ -2,25 +2,13 @@
 
 from __future__ import annotations
 
-from types import MappingProxyType
-
-from homeassistant.config_entries import ConfigEntry, DiscoveryKey
 from homeassistant.core import HomeAssistant
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.animated_scenes.animations import Animations
-from custom_components.animated_scenes.const import (
-    COLOR_SELECTOR_RGB_UI,
-    CONF_COLOR_RGB_DICT,
-    CONF_COLOR_SELECTOR_MODE,
-    DOMAIN,
-    INTEGRATION_NAME,
-)
+from custom_components.animated_scenes.const import DOMAIN
 from custom_components.animated_scenes.diagnostics import async_get_config_entry_diagnostics
-from custom_components.animated_scenes.sensor import AnimatedScenesSensor
-from custom_components.animated_scenes.switch import AnimatedSceneSwitch
-
-DISCOVERY_KEYS: MappingProxyType[str, tuple[DiscoveryKey, ...]] = MappingProxyType({})
 
 
 @pytest.mark.asyncio
@@ -57,21 +45,23 @@ async def test_diagnostics_reports_zero_runtime_without_manager(hass: HomeAssist
     }
 
 
-def test_entities_expose_animated_scenes_device_info(hass: HomeAssistant) -> None:
-    """Group switch and sensor entities under the Animated Scenes device."""
-    switch = AnimatedSceneSwitch(hass, _switch_config(), "entry-id")
-    sensor = AnimatedScenesSensor(hass)
-    expected_device = {
-        "identifiers": {(DOMAIN, "animated_scenes")},
-        "name": INTEGRATION_NAME,
-        "manufacturer": INTEGRATION_NAME,
+@pytest.mark.asyncio
+async def test_diagnostics_reports_zero_runtime_for_invalid_manager(
+    hass: HomeAssistant,
+) -> None:
+    """Return zero runtime counters if the manager is in an invalid state."""
+    Animations.instance = object()  # type: ignore[assignment]
+
+    diagnostics = await async_get_config_entry_diagnostics(hass, _diagnostic_entry())
+
+    assert diagnostics["runtime"] == {
+        "active_animation_count": 0,
+        "active_light_count": 0,
+        "stored_state_count": 0,
     }
 
-    assert switch.device_info == expected_device
-    assert sensor.device_info == expected_device
 
-
-def _diagnostic_entry() -> ConfigEntry:
+def _diagnostic_entry() -> MockConfigEntry:
     """Return a config entry containing every redacted diagnostics key.
 
     Returns:
@@ -79,9 +69,7 @@ def _diagnostic_entry() -> ConfigEntry:
         user-authored scene name.
 
     """
-    return ConfigEntry(
-        version=1,
-        minor_version=1,
+    return MockConfigEntry(
         domain=DOMAIN,
         title="Kitchen Spooky",
         data={
@@ -91,40 +79,8 @@ def _diagnostic_entry() -> ConfigEntry:
             "target": {"entity_id": "light.kitchen"},
             "selector": {"animated_scene_switch": "switch.kitchen_spooky"},
         },
-        discovery_keys=DISCOVERY_KEYS,
         options={},
         source="user",
-        subentries_data={},
         unique_id=None,
         entry_id="spooky",
     )
-
-
-def _switch_config() -> dict[str, object]:
-    """Return config-entry data for constructing a diagnostics switch.
-
-    Returns:
-        A minimal switch configuration with RGB UI colors so construction can
-        build the runtime animation config.
-
-    """
-    return {
-        "name": "Spooky",
-        "icon": "mdi:lightbulb",
-        "lights": ["light.one"],
-        "colors": {},
-        CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_RGB_UI,
-        CONF_COLOR_RGB_DICT: {"one": {"color": [255, 0, 0], "brightness": 255, "weight": 10}},
-        "ignore_off": True,
-        "restore": True,
-        "restore_power": False,
-        "brightness": 255,
-        "transition": 1,
-        "change_frequency": 1,
-        "change_amount": "all",
-        "change_sequence": False,
-        "animate_brightness": True,
-        "animate_color": True,
-        "priority": 0,
-        "entity_type": "scene",
-    }

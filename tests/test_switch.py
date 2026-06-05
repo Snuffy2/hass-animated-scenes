@@ -13,9 +13,11 @@ from custom_components.animated_scenes.const import (
     COLOR_SELECTOR_RGB_UI,
     CONF_COLOR_RGB_DICT,
     CONF_COLOR_SELECTOR_MODE,
+    DOMAIN,
     EVENT_NAME_CHANGE,
     EVENT_STATE_STARTED,
     EVENT_STATE_STOPPED,
+    INTEGRATION_NAME,
 )
 from custom_components.animated_scenes.switch import AnimatedSceneSwitch
 
@@ -68,6 +70,17 @@ async def test_switch_animation_config_ready_in_constructor(hass: HomeAssistant)
             "color_type": "rgb_color",
         }
     ]
+
+
+def test_switch_exposes_animated_scenes_device_info(hass: HomeAssistant) -> None:
+    """Group switch entities under the Animated Scenes device."""
+    switch = AnimatedSceneSwitch(hass, _switch_config(), "entry-id")
+
+    assert switch.device_info == {
+        "identifiers": {(DOMAIN, "animated_scenes")},
+        "name": INTEGRATION_NAME,
+        "manufacturer": INTEGRATION_NAME,
+    }
 
 
 @pytest.mark.asyncio
