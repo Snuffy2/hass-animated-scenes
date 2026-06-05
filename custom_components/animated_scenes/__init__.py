@@ -9,6 +9,12 @@ from homeassistant.helpers.typing import ConfigType
 
 from .animations import Animations
 from .const import CONF_ENTITY_TYPE, DOMAIN, ENTITY_ACTIVITY_SENSOR, ENTITY_SCENE
+from .scene_config import (
+    ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA,
+    REMOVE_LIGHTS_SERVICE_SCHEMA,
+    START_SERVICE_SCHEMA,
+    STOP_SERVICE_SCHEMA,
+)
 from .service import add_lights_to_animation, remove_lights, start_animation, stop_animation
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -30,10 +36,30 @@ async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
         True on successful setup.
 
     """
-    hass.services.async_register(DOMAIN, "start_animation", start_animation)
-    hass.services.async_register(DOMAIN, "stop_animation", stop_animation)
-    hass.services.async_register(DOMAIN, "remove_lights", remove_lights)
-    hass.services.async_register(DOMAIN, "add_lights_to_animation", add_lights_to_animation)
+    hass.services.async_register(
+        DOMAIN,
+        "start_animation",
+        start_animation,
+        schema=START_SERVICE_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "stop_animation",
+        stop_animation,
+        schema=STOP_SERVICE_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "remove_lights",
+        remove_lights,
+        schema=REMOVE_LIGHTS_SERVICE_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "add_lights_to_animation",
+        add_lights_to_animation,
+        schema=ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA,
+    )
     Animations.instance = Animations(hass)
     return True
 
