@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from homeassistant.const import CONF_BRIGHTNESS, CONF_LIGHTS, CONF_NAME
 import pytest
 import voluptuous as vol
 
@@ -24,7 +25,6 @@ from custom_components.animated_scenes.scene_config import (
     normalize_scene_input,
     validate_start_service_data,
 )
-from homeassistant.const import CONF_BRIGHTNESS, CONF_LIGHTS, CONF_NAME
 
 
 def _base_input() -> dict[str, object]:

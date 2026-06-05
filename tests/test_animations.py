@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from types import MappingProxyType
 from unittest.mock import AsyncMock, patch
 
-import pytest
+from homeassistant.config_entries import ConfigEntry, DiscoveryKey
+from homeassistant.core import HomeAssistant
 
 from custom_components.animated_scenes import async_setup, async_unload_entry
 from custom_components.animated_scenes.animations import Animation, Animations
@@ -15,8 +17,9 @@ from custom_components.animated_scenes.scene_config import (
     START_SERVICE_SCHEMA,
     STOP_SERVICE_SCHEMA,
 )
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+import pytest
+
+DISCOVERY_KEYS: MappingProxyType[str, tuple[DiscoveryKey, ...]] = MappingProxyType({})
 
 
 def _animation_config(name: str, lights: list[str], priority: int = 0) -> dict[str, object]:
@@ -64,7 +67,7 @@ def _scene_entry() -> ConfigEntry:
         domain=DOMAIN,
         title="Spooky",
         data={CONF_ENTITY_TYPE: ENTITY_SCENE, "name": "Spooky"},
-        discovery_keys={},
+        discovery_keys=DISCOVERY_KEYS,
         options={},
         source="user",
         subentries_data={},
@@ -111,7 +114,7 @@ async def test_release_light_removes_owner_when_no_successor(hass: HomeAssistant
     animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
     manager.animations[animation.name] = animation
     manager.light_owner["light.one"] = animation
-    manager._light_animations["light.one"] = [animation]  # noqa: SLF001
+    manager._light_animations["light.one"] = [animation]
     manager.store_state("light.one")
 
     with patch.object(
@@ -120,7 +123,7 @@ async def test_release_light_removes_owner_when_no_successor(hass: HomeAssistant
         await manager.release_light(animation, "light.one")
 
     assert "light.one" not in manager.light_owner
-    assert "light.one" not in manager._light_animations  # noqa: SLF001
+    assert "light.one" not in manager._light_animations
     assert "light.one" not in manager.states
     refresh_listener.assert_called_once()
 
@@ -141,7 +144,7 @@ async def test_release_light_hands_owner_to_next_priority(hass: HomeAssistant) -
     manager.animations[low.name] = low
     manager.animations[high.name] = high
     manager.light_owner["light.one"] = high
-    manager._light_animations["light.one"] = [low, high]  # noqa: SLF001
+    manager._light_animations["light.one"] = [low, high]
     manager.store_state("light.one")
 
     await manager.release_light(high, "light.one")
@@ -169,13 +172,13 @@ async def test_release_light_skip_ownership_keeps_remaining_owner(
     manager.animations[removed.name] = removed
     manager.animations[remaining.name] = remaining
     manager.light_owner["light.one"] = removed
-    manager._light_animations["light.one"] = [remaining, removed]  # noqa: SLF001
+    manager._light_animations["light.one"] = [remaining, removed]
     manager.store_state("light.one")
 
     await manager.release_light(removed, "light.one", skip_ownership=True)
 
     assert manager.light_owner["light.one"] is remaining
-    assert manager._light_animations["light.one"] == [remaining]  # noqa: SLF001
+    assert manager._light_animations["light.one"] == [remaining]
     assert "light.one" in manager.states
 
 
@@ -228,10 +231,8 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
     the final manager-wide teardown runs.
     """
 
-    class ReleasingAnimation:
+    class ReleasingAnimation(Animation):
         """Animation stub that follows the real manager release contract."""
-
-        name = "Spooky"
 
         def __init__(self, manager: Animations) -> None:
             """Store the manager and initialize stop accounting.
@@ -242,6 +243,11 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
             """
             self.manager = manager
             self.stop_count = 0
+
+        @property
+        def name(self) -> str:
+            """Return the animation name used by the runtime manager."""
+            return "Spooky"
 
         async def stop(self) -> None:
             """Record one stop call and release from the manager.
@@ -259,8 +265,8 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
     animation = ReleasingAnimation(manager)
     manager.animations["Spooky"] = animation
     manager.states["light.one"] = object()
-    manager.light_owner["light.one"] = animation  # type: ignore[assignment]
-    manager._light_animations["light.one"] = [animation]  # noqa: SLF001
+    manager.light_owner["light.one"] = animation
+    manager._light_animations["light.one"] = [animation]
     entry = _scene_entry()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = dict(entry.data)
 
@@ -271,7 +277,7 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
     assert manager.animations == {}
     assert manager.states == {}
     assert manager.light_owner == {}
-    assert manager._light_animations == {}  # noqa: SLF001
+    assert manager._light_animations == {}
     assert Animations.instance is None
 
 

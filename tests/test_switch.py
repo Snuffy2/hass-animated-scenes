@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import patch
 
-import pytest
+from homeassistant.core import HomeAssistant
 
 from custom_components.animated_scenes.const import (
     COLOR_SELECTOR_RGB_UI,
@@ -15,7 +15,7 @@ from custom_components.animated_scenes.const import (
     EVENT_STATE_STOPPED,
 )
 from custom_components.animated_scenes.switch import AnimatedSceneSwitch
-from homeassistant.core import HomeAssistant
+import pytest
 
 
 def _switch_config() -> dict[str, object]:
@@ -58,7 +58,7 @@ async def test_switch_animation_config_ready_in_constructor(hass: HomeAssistant)
     """
     switch = AnimatedSceneSwitch(hass, _switch_config(), "entry-id")
 
-    assert switch._animation_config["colors"] == [  # noqa: SLF001
+    assert switch._animation_config["colors"] == [
         {
             "color": [255, 0, 0],
             "brightness": 255,
@@ -73,33 +73,33 @@ async def test_switch_tracks_animation_events(hass: HomeAssistant) -> None:
     """Update switch state immediately when animation lifecycle events fire."""
     switch = AnimatedSceneSwitch(hass, _switch_config(), "entry-id")
     switch.hass = hass
-    switch.async_write_ha_state = Mock()  # type: ignore[method-assign]
-    await switch.async_added_to_hass()
+    with patch.object(AnimatedSceneSwitch, "async_write_ha_state") as write_state:
+        await switch.async_added_to_hass()
 
-    hass.bus.async_fire(
-        EVENT_NAME_CHANGE,
-        {"animation": "Spooky", "state": EVENT_STATE_STARTED},
-    )
-    await hass.async_block_till_done()
+        hass.bus.async_fire(
+            EVENT_NAME_CHANGE,
+            {"animation": "Spooky", "state": EVENT_STATE_STARTED},
+        )
+        await hass.async_block_till_done()
 
-    assert switch.is_on is True
-    switch.async_write_ha_state.assert_called()
-    started_write_count = switch.async_write_ha_state.call_count
+        assert switch.is_on is True
+        write_state.assert_called()
+        started_write_count = write_state.call_count
 
-    hass.bus.async_fire(
-        EVENT_NAME_CHANGE,
-        {"animation": "Spooky", "state": EVENT_STATE_STOPPED},
-    )
-    await hass.async_block_till_done()
+        hass.bus.async_fire(
+            EVENT_NAME_CHANGE,
+            {"animation": "Spooky", "state": EVENT_STATE_STOPPED},
+        )
+        await hass.async_block_till_done()
 
-    assert switch.is_on is False
-    assert switch.async_write_ha_state.call_count == started_write_count + 1
+        assert switch.is_on is False
+        assert write_state.call_count == started_write_count + 1
 
-    hass.bus.async_fire(
-        EVENT_NAME_CHANGE,
-        {"animation": "Other", "state": EVENT_STATE_STARTED},
-    )
-    await hass.async_block_till_done()
+        hass.bus.async_fire(
+            EVENT_NAME_CHANGE,
+            {"animation": "Other", "state": EVENT_STATE_STARTED},
+        )
+        await hass.async_block_till_done()
 
-    assert switch.is_on is False
-    assert switch.async_write_ha_state.call_count == started_write_count + 1
+        assert switch.is_on is False
+        assert write_state.call_count == started_write_count + 1

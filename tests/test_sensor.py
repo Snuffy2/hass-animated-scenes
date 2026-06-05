@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import patch
 
-import pytest
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.animated_scenes.animations import Animations
@@ -17,7 +17,7 @@ from custom_components.animated_scenes.const import (
     EVENT_STATE_STARTED,
 )
 from custom_components.animated_scenes.sensor import AnimatedScenesSensor
-from homeassistant.core import HomeAssistant
+import pytest
 
 
 @pytest.mark.asyncio
@@ -31,16 +31,18 @@ async def test_activity_sensor_writes_state_on_animation_event(hass: HomeAssista
     Animations.instance = manager
     sensor = AnimatedScenesSensor(hass)
     sensor.hass = hass
-    sensor.async_write_ha_state = Mock()  # type: ignore[method-assign]
 
     assert sensor.should_poll is False
 
-    await sensor.async_added_to_hass()
+    with patch.object(AnimatedScenesSensor, "async_write_ha_state") as write_state:
+        await sensor.async_added_to_hass()
 
-    hass.bus.async_fire(EVENT_NAME_CHANGE, {"animation": "Spooky", "state": EVENT_STATE_STARTED})
-    await hass.async_block_till_done()
+        hass.bus.async_fire(
+            EVENT_NAME_CHANGE, {"animation": "Spooky", "state": EVENT_STATE_STARTED}
+        )
+        await hass.async_block_till_done()
 
-    sensor.async_write_ha_state.assert_called_once()
+    write_state.assert_called_once()
 
 
 @pytest.mark.asyncio

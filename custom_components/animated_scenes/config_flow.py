@@ -8,14 +8,13 @@ functions used to parse and validate user input from the UI.
 import logging
 from typing import Any
 
-import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_BRIGHTNESS, CONF_ICON, CONF_LIGHTS, CONF_NAME, Platform
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 import homeassistant.helpers.config_validation as cv
 from homeassistant.util import uuid
+import voluptuous as vol
 
 from .const import (
     ABORT_ACTIVITY_SENSOR_NO_OPTIONS,

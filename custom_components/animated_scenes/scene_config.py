@@ -5,8 +5,6 @@ from __future__ import annotations
 import copy
 from typing import Any
 
-import voluptuous as vol
-
 from homeassistant.components.light import (
     ATTR_COLOR_TEMP_KELVIN,
     ATTR_HS_COLOR,
@@ -18,6 +16,7 @@ from homeassistant.components.light import (
 )
 from homeassistant.const import CONF_BRIGHTNESS, CONF_LIGHTS, CONF_NAME
 import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
 
 from .const import (
     ATTR_COLOR_TEMP,
@@ -219,7 +218,7 @@ def is_int(value: Any) -> tuple[bool, Any]:
         return False, value
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return False, value
     if parsed.is_integer():
         return True, int(parsed)

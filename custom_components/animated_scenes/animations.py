@@ -17,8 +17,6 @@ import math
 from random import choices, randrange, sample, uniform
 from typing import Any
 
-import voluptuous as vol
-
 from homeassistant.components.light import (
     ATTR_COLOR_MODE,
     ATTR_COLOR_TEMP_KELVIN,
@@ -52,6 +50,7 @@ from homeassistant.util.color import (
     color_temperature_to_rgb,
     color_xy_to_RGB,
 )
+import voluptuous as vol
 
 from .const import (
     ATTR_COLOR_TEMP,
@@ -403,14 +402,14 @@ class Animation:
             try:
                 r, g, b = color[CONF_COLOR]
                 return (int(r), int(g), int(b))
-            except (TypeError, ValueError, IndexError):
+            except TypeError, ValueError, IndexError:
                 return None
 
         if ctype == ATTR_RGBW_COLOR:
             try:
                 r, g, b, w = color[CONF_COLOR]
                 return color_rgbw_to_rgb(r, g, b, w)
-            except (TypeError, ValueError, IndexError):
+            except TypeError, ValueError, IndexError:
                 return None
 
         if ctype == ATTR_RGBWW_COLOR:
@@ -419,7 +418,7 @@ class Animation:
                 r, g, b, cw, ww = color[CONF_COLOR]
                 # Call with required min/max kelvin bounds.
                 return color_rgbww_to_rgb(r, g, b, cw, ww, MIN_KELVIN, MAX_KELVIN)
-            except (TypeError, ValueError, IndexError):
+            except TypeError, ValueError, IndexError:
                 return None
 
         if ctype == ATTR_COLOR_TEMP_KELVIN:
@@ -432,7 +431,7 @@ class Animation:
                     int(min(max(g_f * 255.0, 0), 255)),
                     int(min(max(b_f * 255.0, 0), 255)),
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None
 
         if ctype == ATTR_HS_COLOR:
@@ -441,7 +440,7 @@ class Animation:
                 # Home Assistant helper expects HS -> RGB (0..360, 0..100)
                 r, g, b = color_hs_to_RGB(float(h), float(s))
                 return (int(r), int(g), int(b))
-            except (TypeError, ValueError, IndexError):
+            except TypeError, ValueError, IndexError:
                 return None
 
         if ctype == ATTR_XY_COLOR:
@@ -449,7 +448,7 @@ class Animation:
                 x, y = color[CONF_COLOR]
                 r, g, b = color_xy_to_RGB(float(x), float(y))
                 return (int(r), int(g), int(b))
-            except (TypeError, ValueError, IndexError):
+            except TypeError, ValueError, IndexError:
                 return None
 
         return None
@@ -484,11 +483,11 @@ class Animation:
                 # color_rgb_to_rgbw expects r,g,b and returns (r,g,b,w)
                 rgbw = color_rgb_to_rgbw(r, g, b)
                 return list(rgbw)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 # Preserve original white channel if conversion fails
                 try:
                     whites = list(color[CONF_COLOR][3:4])
-                except (IndexError, TypeError, ValueError):
+                except IndexError, TypeError, ValueError:
                     whites = []
                 return [r, g, b, *whites]
 
@@ -497,10 +496,10 @@ class Animation:
                 # Call the helper with min/max kelvin bounds
                 rgbww = color_rgb_to_rgbww(r, g, b, MIN_KELVIN, MAX_KELVIN)
                 return list(rgbww)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 try:
                     whites = list(color[CONF_COLOR][3:5])
-                except (IndexError, TypeError, ValueError):
+                except IndexError, TypeError, ValueError:
                     whites = []
                 return [r, g, b, *whites]
 
@@ -508,21 +507,21 @@ class Animation:
             try:
                 h, s = color_RGB_to_hs(float(r), float(g), float(b))
                 return [round(h, 1), round(s, 1)]
-            except (IndexError, TypeError, ValueError):
+            except IndexError, TypeError, ValueError:
                 return [r, g, b]
 
         if ctype == ATTR_XY_COLOR:
             try:
                 x, y = color_RGB_to_xy(int(r), int(g), int(b))
                 return [round(x, 4), round(y, 4)]
-            except (IndexError, TypeError, ValueError):
+            except IndexError, TypeError, ValueError:
                 return [r, g, b]
 
         if ctype == ATTR_COLOR_TEMP_KELVIN:
             try:
                 kelvin = _rgb_to_kelvin((r, g, b))
                 return int(kelvin)
-            except (IndexError, TypeError, ValueError):
+            except IndexError, TypeError, ValueError:
                 return [r, g, b]
         return color.get(CONF_COLOR) if CONF_COLOR in color else []
 
