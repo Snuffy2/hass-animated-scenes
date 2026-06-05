@@ -13,7 +13,7 @@ from typing import Any
 from homeassistant.components.switch import ENTITY_ID_FORMAT, SwitchEntity
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_BRIGHTNESS, CONF_ICON, CONF_LIGHTS, CONF_NAME, MATCH_ALL
-from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, Event, HomeAssistant, callback
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import IntegrationError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -78,7 +78,7 @@ async def async_setup_platform(
     )
     async_create_issue(
         hass,
-        HOMEASSISTANT_DOMAIN,
+        DOMAIN,
         f"deprecated_yaml_{DOMAIN}",
         breaks_in_ha_version="2025.1",
         is_fixable=False,

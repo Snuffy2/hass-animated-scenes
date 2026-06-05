@@ -43,6 +43,7 @@ from .const import (
     CONF_COLORS,
     CONF_ENTITY_TYPE,
     CONF_IGNORE_OFF,
+    CONF_PLATFORM,
     CONF_PRIORITY,
     CONF_RESTORE,
     CONF_RESTORE_POWER,
@@ -110,6 +111,7 @@ def _validate_yaml_runtime_data(data: dict[str, Any]) -> None:
     runtime_data.pop(CONF_COLOR_SELECTOR_MODE, None)
     runtime_data.pop(CONF_ENTITY_TYPE, None)
     runtime_data.pop(CONF_ICON, None)
+    runtime_data.pop(CONF_PLATFORM, None)
     validate_start_service_data(runtime_data)
 
 

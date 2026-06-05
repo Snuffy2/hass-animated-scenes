@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 from unittest.mock import AsyncMock, patch
 
+from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.animated_scenes.animations import Animations
 from custom_components.animated_scenes.const import (
@@ -20,7 +22,7 @@ from custom_components.animated_scenes.const import (
     EVENT_STATE_STOPPED,
     INTEGRATION_NAME,
 )
-from custom_components.animated_scenes.switch import AnimatedSceneSwitch
+from custom_components.animated_scenes.switch import AnimatedSceneSwitch, async_setup_platform
 
 
 def _switch_config() -> dict[str, object]:
@@ -58,6 +60,23 @@ def _runtime_manager(hass: HomeAssistant) -> Animations:
     manager = Animations(hass)
     Animations.instance = manager
     return manager
+
+
+@pytest.mark.asyncio
+async def test_legacy_yaml_repair_uses_integration_domain(hass: HomeAssistant) -> None:
+    """Register legacy YAML repairs under the Animated Scenes integration."""
+    MockConfigEntry(domain=DOMAIN, title="Spooky", data={}, entry_id="spooky").add_to_hass(hass)
+
+    with patch("custom_components.animated_scenes.switch.async_create_issue") as create_issue:
+        await async_setup_platform(hass, {CONF_NAME: "Spooky"}, AsyncMock())
+
+    create_issue.assert_called_once()
+    assert create_issue.call_args.args[:3] == (
+        hass,
+        DOMAIN,
+        f"deprecated_yaml_{DOMAIN}",
+    )
+    assert create_issue.call_args.kwargs["issue_domain"] == DOMAIN
 
 
 @pytest.mark.asyncio

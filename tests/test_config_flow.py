@@ -22,6 +22,7 @@ from custom_components.animated_scenes.const import (
     CONF_COLOR_WEIGHT,
     CONF_COLORS,
     CONF_ENTITY_TYPE,
+    CONF_PLATFORM,
     CONF_TRANSITION,
     DEFAULT_BRIGHTNESS,
     DEFAULT_COLOR_NEARBY_COLORS,
@@ -192,6 +193,22 @@ async def test_options_rename_stops_previous_animation_before_reload(
     assert entry.title == "Scary"
     assert entry.data[CONF_NAME] == "Scary"
     assert result["type"] == "create_entry"
+
+
+async def test_options_yaml_accepts_imported_legacy_platform(
+    hass: HomeAssistant,
+) -> None:
+    """Ignore legacy YAML platform metadata during runtime validation."""
+    flow, entry = _options_flow(hass)
+    flow._data[CONF_PLATFORM] = DOMAIN
+
+    with patch.object(hass.config_entries, "async_reload", AsyncMock()):
+        result = await flow.async_step_color_yaml(
+            {CONF_COLORS: [{"color_type": "rgb_color", "color": [255, 0, 0]}]}
+        )
+
+    assert result["type"] == "create_entry"
+    assert entry.data[CONF_PLATFORM] == DOMAIN
 
 
 @pytest.mark.parametrize(
