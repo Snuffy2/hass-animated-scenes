@@ -13,7 +13,12 @@ from homeassistant.exceptions import HomeAssistantError, IntegrationError
 import pytest
 
 from custom_components.animated_scenes import async_setup, async_setup_entry, async_unload_entry
-from custom_components.animated_scenes.animations import Animation, Animations, safe_call
+from custom_components.animated_scenes.animations import (
+    Animation,
+    Animations,
+    _rgb_to_kelvin,
+    safe_call,
+)
 from custom_components.animated_scenes.const import (
     CONF_ENTITY_TYPE,
     CONF_LIGHTS,
@@ -98,6 +103,16 @@ def _runtime_manager(hass: HomeAssistant) -> Animations:
     manager = Animations(hass)
     Animations.instance = manager
     return manager
+
+
+def test_rgb_to_kelvin_caches_repeated_lookup() -> None:
+    """Avoid repeating the expensive kelvin search for the same RGB value."""
+    _rgb_to_kelvin.cache_clear()
+
+    _rgb_to_kelvin((255, 128, 64))
+    _rgb_to_kelvin((255, 128, 64))
+
+    assert _rgb_to_kelvin.cache_info().hits == 1
 
 
 @pytest.mark.asyncio
