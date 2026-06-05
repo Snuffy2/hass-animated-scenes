@@ -270,6 +270,8 @@ class Animation:
             None
 
         """
+        if entity_id not in self._lights:
+            self._lights.append(entity_id)
         state = self._hass.states.get(entity_id)
         if state is None:
             _LOGGER.warning("Entity %s not found, skipping", entity_id)
@@ -701,7 +703,9 @@ class Animation:
         )
 
     def remove_light(self, light: str) -> None:
-        """Remove a light from this animation's active list."""
+        """Remove a light from this animation's configured and active lists."""
+        if light in self._lights:
+            self._lights.remove(light)
         if light in self._active_lights:
             self._active_lights.remove(light)
 

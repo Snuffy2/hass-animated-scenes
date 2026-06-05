@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import cast
 from unittest.mock import AsyncMock, patch
 
-from homeassistant.const import CONF_LIGHTS, CONF_NAME
+from homeassistant.const import CONF_BRIGHTNESS, CONF_LIGHTS, CONF_NAME
 from homeassistant.core import HomeAssistant
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -23,12 +23,18 @@ from custom_components.animated_scenes.const import (
     CONF_COLORS,
     CONF_ENTITY_TYPE,
     CONF_TRANSITION,
+    DEFAULT_BRIGHTNESS,
     DEFAULT_COLOR_NEARBY_COLORS,
     DEFAULT_COLOR_WEIGHT,
     DOMAIN,
     ENTITY_SCENE,
+    ERROR_BRIGHTNESS_NOT_INT_OR_RANGE,
     ERROR_COLORS_IS_BLANK,
     ERROR_COLORS_MALFORMED,
+)
+from custom_components.animated_scenes.scene_config import (
+    build_colors_from_rgb_dict,
+    validate_start_service_data,
 )
 
 
@@ -110,6 +116,7 @@ async def test_options_rgb_ui_defaults_missing_optional_color_values(
 
     assert result["type"] == "create_entry"
     color_data = next(iter(entry.data[CONF_COLOR_RGB_DICT].values()))
+    assert color_data[CONF_BRIGHTNESS] == DEFAULT_BRIGHTNESS
     assert color_data[CONF_COLOR_WEIGHT] == DEFAULT_COLOR_WEIGHT
     assert color_data[CONF_COLOR_NEARBY_COLORS] == DEFAULT_COLOR_NEARBY_COLORS
 
@@ -126,6 +133,38 @@ async def test_options_rgb_ui_adds_color_when_stored_color_dict_is_missing(
 
     assert result["type"] == "create_entry"
     assert len(entry.data[CONF_COLOR_RGB_DICT]) == 1
+    color_data = next(iter(entry.data[CONF_COLOR_RGB_DICT].values()))
+    assert color_data[CONF_BRIGHTNESS] == DEFAULT_BRIGHTNESS
+
+    runtime_data = dict(entry.data)
+    runtime_data[CONF_COLORS] = build_colors_from_rgb_dict(entry.data[CONF_COLOR_RGB_DICT])
+    runtime_data.pop(CONF_COLOR_RGB_DICT)
+    runtime_data.pop(CONF_COLOR_SELECTOR_MODE)
+    runtime_data.pop(CONF_ENTITY_TYPE)
+    validate_start_service_data(runtime_data)
+
+
+async def test_options_rgb_ui_invalid_edit_does_not_mutate_entry_data(
+    hass: HomeAssistant,
+) -> None:
+    """Validate edited RGB UI color data without aliasing config entry data."""
+    stored_color = {
+        CONF_COLOR: [255, 0, 0],
+        CONF_BRIGHTNESS: DEFAULT_BRIGHTNESS,
+        CONF_COLOR_WEIGHT: DEFAULT_COLOR_WEIGHT,
+        CONF_COLOR_NEARBY_COLORS: DEFAULT_COLOR_NEARBY_COLORS,
+    }
+    flow, entry = _options_flow(
+        hass,
+        selector_mode=COLOR_SELECTOR_RGB_UI,
+        color_rgb_dict={"red": stored_color},
+    )
+
+    result = await flow.async_step_color_rgb_ui({CONF_BRIGHTNESS: "invalid"})
+
+    assert result["type"] == "form"
+    assert result["errors"] == {"base": ERROR_BRIGHTNESS_NOT_INT_OR_RANGE}
+    assert entry.data[CONF_COLOR_RGB_DICT] == {"red": stored_color}
 
 
 async def test_options_rename_stops_previous_animation_before_reload(

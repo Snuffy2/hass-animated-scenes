@@ -266,6 +266,23 @@ async def test_add_lights_to_animation_fires_update_event(hass: HomeAssistant) -
 
 
 @pytest.mark.asyncio
+async def test_add_lights_to_animation_updates_refresh_membership(
+    hass: HomeAssistant,
+) -> None:
+    """Keep configured membership synced with runtime ownership maps."""
+    manager = _runtime_manager(hass)
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+    hass.states.async_set("light.two", "on", {"brightness": 100, "color_mode": "rgb"})
+    animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
+    manager.animations[animation.name] = animation
+
+    await manager.add_lights_to_animation({CONF_NAME: "Spooky", CONF_LIGHTS: ["light.two"]})
+
+    assert "light.two" in animation.lights
+    assert manager.refresh_animation_for_light("light.two") is animation
+
+
+@pytest.mark.asyncio
 async def test_add_lights_to_animation_rejects_missing_switch(
     hass: HomeAssistant,
 ) -> None:
@@ -297,6 +314,22 @@ async def test_remove_lights_fires_update_event(hass: HomeAssistant) -> None:
 
     release_light.assert_awaited_once_with(animation, "light.one", True, True)
     assert {"animation": "Spooky", "state": EVENT_STATE_UPDATED} in events
+
+
+@pytest.mark.asyncio
+async def test_remove_lights_updates_refresh_membership(hass: HomeAssistant) -> None:
+    """Remove released lights from configured membership used for refresh."""
+    manager = _runtime_manager(hass)
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+    animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
+    manager.animations[animation.name] = animation
+    manager.light_owner["light.one"] = animation
+    manager._light_animations["light.one"] = [animation]
+
+    with patch.object(manager, "release_light", AsyncMock()):
+        await manager.remove_lights({CONF_LIGHTS: ["light.one"], CONF_SKIP_RESTORE: True})
+
+    assert "light.one" not in animation.lights
 
 
 @pytest.mark.asyncio

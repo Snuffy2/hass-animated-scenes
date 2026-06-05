@@ -5,6 +5,7 @@ Assistant to configure Animated Scenes. It includes small helper
 functions used to parse and validate user input from the UI.
 """
 
+import copy
 from functools import partial
 import logging
 from typing import Any
@@ -144,6 +145,8 @@ def _normalize_rgb_ui_color_input(color_data: dict[str, Any]) -> str | None:
     )
     if not brightness_check:
         return ERROR_BRIGHTNESS_NOT_INT_OR_RANGE
+    if brightness_value is None:
+        brightness_value = DEFAULT_BRIGHTNESS
     color_data[CONF_BRIGHTNESS] = brightness_value
     color_data[CONF_COLOR_WEIGHT] = round(color_data.get(CONF_COLOR_WEIGHT, DEFAULT_COLOR_WEIGHT))
     color_data[CONF_COLOR_NEARBY_COLORS] = round(
@@ -516,6 +519,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         self.config = config_entry
         self._data = dict(config_entry.data)
         rgb_dict = self._data.get(CONF_COLOR_RGB_DICT, {})
+        self._data[CONF_COLOR_RGB_DICT] = copy.deepcopy(rgb_dict)
         self._rgb_ui_color_keys = list(rgb_dict)
         self._rgb_ui_color_values = list(rgb_dict.values())
         self._rgb_ui_color_max = len(self._rgb_ui_color_keys)
@@ -622,7 +626,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         errors: dict[str, Any] = {}
 
         if self._rgb_ui_color_index + 1 <= self._rgb_ui_color_max:
-            color_data = self._rgb_ui_color_values[self._rgb_ui_color_index]
+            color_data = copy.deepcopy(self._rgb_ui_color_values[self._rgb_ui_color_index])
         else:
             color_data = {}
 
