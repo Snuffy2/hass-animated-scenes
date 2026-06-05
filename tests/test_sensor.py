@@ -63,7 +63,7 @@ async def test_activity_sensor_duplicate_check_uses_config_entries(
 ) -> None:
     """Detect an existing activity sensor from loaded config entries.
 
-    Config flows can run before ``hass.data`` has been rebuilt, so duplicate
+    Config flows can run before entries have runtime data, so duplicate
     activity-sensor suppression must inspect Home Assistant config entries.
     """
     entry = MockConfigEntry(

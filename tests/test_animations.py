@@ -87,9 +87,9 @@ def _scene_entry() -> ConfigEntry:
     )
 
 
-def _store_scene_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Store scene entry data in hass.data for unload lifecycle tests."""
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = dict(entry.data)
+def _store_scene_entry(entry: ConfigEntry) -> None:
+    """Store scene entry data in runtime data for unload lifecycle tests."""
+    entry.runtime_data = dict(entry.data)
 
 
 @pytest.mark.asyncio
@@ -348,7 +348,7 @@ async def test_unload_entry_stops_scene_animation(hass: HomeAssistant) -> None:
     animation.name = "Spooky"
     manager.animations["Spooky"] = animation
     entry = _scene_entry()
-    _store_scene_entry(hass, entry)
+    _store_scene_entry(entry)
 
     with patch.object(hass.config_entries, "async_unload_platforms", return_value=True):
         assert await async_unload_entry(hass, entry) is True
@@ -399,7 +399,7 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
     animation = ReleasingAnimation(manager)
     manager.animations["Spooky"] = animation
     entry = _scene_entry()
-    _store_scene_entry(hass, entry)
+    _store_scene_entry(entry)
 
     with patch.object(hass.config_entries, "async_unload_platforms", return_value=True):
         assert await async_unload_entry(hass, entry) is True
@@ -433,7 +433,7 @@ async def test_start_service_still_works_after_last_entry_unload(
     animation.name = "Spooky"
     manager.animations["Spooky"] = animation
     entry = _scene_entry()
-    _store_scene_entry(hass, entry)
+    _store_scene_entry(entry)
 
     with patch.object(hass.config_entries, "async_unload_platforms", return_value=True):
         assert await async_unload_entry(hass, entry) is True
@@ -462,10 +462,10 @@ async def test_unload_entry_keeps_animation_when_platform_unload_fails(
     animation.name = "Spooky"
     manager.animations["Spooky"] = animation
     entry = _scene_entry()
-    _store_scene_entry(hass, entry)
+    _store_scene_entry(entry)
 
     with patch.object(hass.config_entries, "async_unload_platforms", return_value=False):
         assert await async_unload_entry(hass, entry) is False
 
     animation.stop.assert_not_awaited()
-    assert hass.data[DOMAIN][entry.entry_id]["name"] == "Spooky"
+    assert entry.runtime_data["name"] == "Spooky"

@@ -112,7 +112,7 @@ async def async_setup_entry(
     Instantiate and register the `AnimatedSceneSwitch` entity for the
     provided config entry.
     """
-    config = hass.data[DOMAIN][config_entry.entry_id]
+    config = config_entry.runtime_data
     unique_id: str = config_entry.entry_id
     async_add_entities([AnimatedSceneSwitch(hass, config, unique_id)])
 
