@@ -5,6 +5,7 @@ Assistant to configure Animated Scenes. It includes small helper
 functions used to parse and validate user input from the UI.
 """
 
+from functools import partial
 import logging
 from typing import Any
 
@@ -102,6 +103,16 @@ def _validate_yaml_runtime_data(data: dict[str, Any]) -> None:
     validate_start_service_data(runtime_data)
 
 
+def _schema_default(
+    user_input: dict[str, Any],
+    default_dict: dict[str, Any],
+    key: str,
+    fallback_default: Any = None,
+) -> Any:
+    """Return a schema default from user input, stored defaults, or fallback."""
+    return user_input.get(key, default_dict.get(key, fallback_default))
+
+
 async def _async_build_schema(
     user_input: dict[str, Any] | None,
     default_dict: dict[str, Any],
@@ -110,16 +121,13 @@ async def _async_build_schema(
     """Build a schema using the default_dict as a backup."""
     if user_input is None:
         user_input = {}
-
-    def _get_default(key: str, fallback_default: Any = None) -> Any:
-        """Get default value for key."""
-        return user_input.get(key, default_dict.get(key, fallback_default))
+    default = partial(_schema_default, user_input, default_dict)
 
     build_schema = vol.Schema(
         {
             vol.Required(
                 CONF_NAME,
-                default=_get_default(CONF_NAME),
+                default=default(CONF_NAME),
             ): selector.TextSelector(selector.TextSelectorConfig()),
         }
     )
@@ -127,14 +135,16 @@ async def _async_build_schema(
         build_schema = build_schema.extend(
             {
                 vol.Optional(
-                    CONF_ICON, default=_get_default(CONF_ICON, DEFAULT_ICON)
+                    CONF_ICON,
+                    default=default(CONF_ICON, DEFAULT_ICON),
                 ): selector.IconSelector(selector.IconSelectorConfig()),
             }
         )
     build_schema = build_schema.extend(
         {
             vol.Optional(
-                CONF_PRIORITY, default=_get_default(CONF_PRIORITY, DEFAULT_PRIORITY)
+                CONF_PRIORITY,
+                default=default(CONF_PRIORITY, DEFAULT_PRIORITY),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=-100,
@@ -145,47 +155,46 @@ async def _async_build_schema(
             vol.Optional(
                 CONF_CHANGE_FREQUENCY,
                 default=list_or_int_to_str(
-                    _get_default(CONF_CHANGE_FREQUENCY, DEFAULT_CHANGE_FREQUENCY)
+                    default(CONF_CHANGE_FREQUENCY, DEFAULT_CHANGE_FREQUENCY)
                 ),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_TRANSITION,
-                default=list_or_int_to_str(_get_default(CONF_TRANSITION, DEFAULT_TRANSITION)),
+                default=list_or_int_to_str(default(CONF_TRANSITION, DEFAULT_TRANSITION)),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_CHANGE_AMOUNT,
-                default=list_or_int_to_str(_get_default(CONF_CHANGE_AMOUNT, DEFAULT_CHANGE_AMOUNT)),
+                default=list_or_int_to_str(default(CONF_CHANGE_AMOUNT, DEFAULT_CHANGE_AMOUNT)),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_BRIGHTNESS,
-                default=list_or_int_to_str(_get_default(CONF_BRIGHTNESS, DEFAULT_BRIGHTNESS)),
+                default=list_or_int_to_str(default(CONF_BRIGHTNESS, DEFAULT_BRIGHTNESS)),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_CHANGE_SEQUENCE,
-                default=_get_default(CONF_CHANGE_SEQUENCE, DEFAULT_CHANGE_SEQUENCE),
+                default=default(CONF_CHANGE_SEQUENCE, DEFAULT_CHANGE_SEQUENCE),
             ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
             vol.Optional(
                 CONF_ANIMATE_BRIGHTNESS,
-                default=_get_default(CONF_ANIMATE_BRIGHTNESS, DEFAULT_ANIMATE_BRIGHTNESS),
+                default=default(CONF_ANIMATE_BRIGHTNESS, DEFAULT_ANIMATE_BRIGHTNESS),
             ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
             vol.Optional(
                 CONF_ANIMATE_COLOR,
-                default=_get_default(CONF_ANIMATE_COLOR, DEFAULT_ANIMATE_COLOR),
+                default=default(CONF_ANIMATE_COLOR, DEFAULT_ANIMATE_COLOR),
             ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
             vol.Optional(
                 CONF_IGNORE_OFF,
-                default=_get_default(CONF_IGNORE_OFF, DEFAULT_IGNORE_OFF),
+                default=default(CONF_IGNORE_OFF, DEFAULT_IGNORE_OFF),
             ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
             vol.Optional(
-                CONF_RESTORE, default=_get_default(CONF_RESTORE, DEFAULT_RESTORE)
+                CONF_RESTORE,
+                default=default(CONF_RESTORE, DEFAULT_RESTORE),
             ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
             vol.Optional(
                 CONF_RESTORE_POWER,
-                default=_get_default(CONF_RESTORE_POWER, DEFAULT_RESTORE_POWER),
+                default=default(CONF_RESTORE_POWER, DEFAULT_RESTORE_POWER),
             ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
-            vol.Required(
-                CONF_LIGHTS, default=_get_default(CONF_LIGHTS, [])
-            ): selector.EntitySelector(
+            vol.Required(CONF_LIGHTS, default=default(CONF_LIGHTS, [])): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain=[Platform.LIGHT], multiple=True),
             ),
         }
@@ -194,7 +203,8 @@ async def _async_build_schema(
     return build_schema.extend(
         {
             vol.Required(
-                CONF_COLOR_SELECTOR_MODE, default=_get_default(CONF_COLOR_SELECTOR_MODE, "")
+                CONF_COLOR_SELECTOR_MODE,
+                default=default(CONF_COLOR_SELECTOR_MODE, ""),
             ): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=COLOR_SELECTOR_OPTION_LIST,
@@ -213,14 +223,12 @@ async def _async_build_color_yaml_schema(
     """Build a color YAML schema using the default_dict as a backup."""
     if user_input is None:
         user_input = {}
-
-    def _get_default(key: str, fallback_default: Any = None) -> Any:
-        """Get default value for key."""
-        return user_input.get(key, default_dict.get(key, fallback_default))
+    default = partial(_schema_default, user_input, default_dict)
 
     build_schema = vol.Schema({})
 
-    if _get_default(CONF_COLORS) is None or _get_default(CONF_COLORS) == {}:
+    colors_default = default(CONF_COLORS)
+    if colors_default is None or colors_default == {}:
         build_schema = build_schema.extend(
             {
                 vol.Required(CONF_COLORS): selector.ObjectSelector(),
@@ -229,9 +237,7 @@ async def _async_build_color_yaml_schema(
     else:
         build_schema = build_schema.extend(
             {
-                vol.Required(
-                    CONF_COLORS, default=_get_default(CONF_COLORS)
-                ): selector.ObjectSelector(),
+                vol.Required(CONF_COLORS, default=colors_default): selector.ObjectSelector(),
             }
         )
 
@@ -247,23 +253,20 @@ async def _async_build_color_rgb_ui_schema(
     """Build a color RGB UI schema using the default_dict as a backup."""
     if user_input is None:
         user_input = {}
-
-    def _get_default(key: str, fallback_default: Any = None) -> Any:
-        """Get default value for key."""
-        return user_input.get(key, default_dict.get(key, fallback_default))
+    default = partial(_schema_default, user_input, default_dict)
 
     build_schema = vol.Schema(
         {
-            vol.Optional(CONF_COLOR, default=_get_default(CONF_COLOR)): selector.ColorRGBSelector(
+            vol.Optional(CONF_COLOR, default=default(CONF_COLOR)): selector.ColorRGBSelector(
                 selector.ColorRGBSelectorConfig()
             ),
             vol.Optional(
                 CONF_BRIGHTNESS,
-                default=list_or_int_to_str(_get_default(CONF_BRIGHTNESS, DEFAULT_BRIGHTNESS)),
+                default=list_or_int_to_str(default(CONF_BRIGHTNESS, DEFAULT_BRIGHTNESS)),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_COLOR_WEIGHT,
-                default=_get_default(CONF_COLOR_WEIGHT, DEFAULT_COLOR_WEIGHT),
+                default=default(CONF_COLOR_WEIGHT, DEFAULT_COLOR_WEIGHT),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
@@ -273,13 +276,11 @@ async def _async_build_color_rgb_ui_schema(
             ),
             vol.Optional(
                 CONF_COLOR_ONE_CHANGE_PER_TICK,
-                default=_get_default(
-                    CONF_COLOR_ONE_CHANGE_PER_TICK, DEFAULT_COLOR_ONE_CHANGE_PER_TICK
-                ),
+                default=default(CONF_COLOR_ONE_CHANGE_PER_TICK, DEFAULT_COLOR_ONE_CHANGE_PER_TICK),
             ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
             vol.Optional(
                 CONF_COLOR_NEARBY_COLORS,
-                default=_get_default(CONF_COLOR_NEARBY_COLORS, DEFAULT_COLOR_NEARBY_COLORS),
+                default=default(CONF_COLOR_NEARBY_COLORS, DEFAULT_COLOR_NEARBY_COLORS),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
@@ -294,7 +295,7 @@ async def _async_build_color_rgb_ui_schema(
             {
                 vol.Optional(
                     CONF_COLOR_ADD_COLOR,
-                    default=_get_default(CONF_COLOR_ADD_COLOR, DEFAULT_COLOR_ADD_COLOR),
+                    default=default(CONF_COLOR_ADD_COLOR, DEFAULT_COLOR_ADD_COLOR),
                 ): cv.boolean,
             }
         )
@@ -304,7 +305,7 @@ async def _async_build_color_rgb_ui_schema(
             {
                 vol.Required(
                     CONF_COLOR_DELETE_COLOR,
-                    default=_get_default(CONF_COLOR_DELETE_COLOR, DEFAULT_COLOR_DELETE_COLOR),
+                    default=default(CONF_COLOR_DELETE_COLOR, DEFAULT_COLOR_DELETE_COLOR),
                 ): cv.boolean,
             }
         )

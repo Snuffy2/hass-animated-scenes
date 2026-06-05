@@ -710,18 +710,19 @@ class Animation:
 
         """
         if Animations.instance and Animations.instance.get_animation_for_light(entity_id) != self:
-            return _LOGGER.info(
+            _LOGGER.info(
                 "Skipping light %s due to conflicting animation with higher priority, %s",
                 entity_id,
                 self._name,
             )
+            return
         await safe_call(
             self._hass,
             LIGHT_DOMAIN,
             SERVICE_TURN_ON,
             self.build_light_attributes(entity_id, initial),
         )
-        return None
+        return
 
     async def update_lights(self) -> None:
         """Select lights to update this tick and apply updates concurrently."""
@@ -1026,30 +1027,33 @@ class Animations:
 
         current_owner = self.light_owner.get(entity_id)
         if current_owner is not None and current_owner != animation:
-            return _LOGGER.info(
+            _LOGGER.info(
                 "Not releasing light %s as it is owned by another animation %s",
                 entity_id,
                 current_owner.name,
             )
+            return
         if animations_for_light and not skip_ownership:
             light_owner = self.refresh_animation_for_light(entity_id)
             if light_owner:
                 self.light_owner[entity_id] = light_owner
-                return _LOGGER.info(
+                _LOGGER.info(
                     "Changing owner from %s to %s",
                     animation.name,
                     light_owner.name,
                 )
+                return
         if animations_for_light:
             light_owner = self.refresh_animation_for_light(entity_id)
             if light_owner:
                 self.light_owner[entity_id] = light_owner
-                return _LOGGER.info(
+                _LOGGER.info(
                     "Keeping owner %s for light %s after releasing %s",
                     light_owner.name,
                     entity_id,
                     animation.name,
                 )
+                return
         if animation.restore and not skip_restore and entity_id in self.states:
             previous_state = self.states[entity_id]
             if previous_state.state == "on":
@@ -1066,7 +1070,7 @@ class Animations:
         if not animations_for_light:
             self._light_animations.pop(entity_id, None)
         self.refresh_listener()
-        return None
+        return
 
     async def add_lights_to_animation(self, data: dict[str, Any]) -> None:
         """Service handler to add lights to an already running animation.
