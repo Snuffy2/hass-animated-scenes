@@ -425,17 +425,20 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
     for key, default in SCENE_DEFAULTS.items():
         normalized.setdefault(key, default)
 
-    if len(normalized.get(CONF_LIGHTS, [])) == 0:
+    try:
+        lights = cv.entity_ids(normalized.get(CONF_LIGHTS, []))
+    except vol.Invalid as err:
+        raise vol.Invalid(ERROR_MUST_SELECT_LIGHTS) from err
+    if len(lights) == 0:
         raise vol.Invalid(ERROR_MUST_SELECT_LIGHTS)
+    normalized[CONF_LIGHTS] = lights
 
     change_ok, change_value = is_int_list_or_all(
         normalized.get(CONF_CHANGE_AMOUNT), CHANGE_AMOUNT_MIN, CHANGE_AMOUNT_MAX
     )
     if not change_ok:
         raise vol.Invalid(ERROR_CHANGE_AMOUNT_NOT_INT_OR_ALL)
-    normalized[CONF_CHANGE_AMOUNT] = override_max_change_amount(
-        change_value, len(normalized.get(CONF_LIGHTS, []))
-    )
+    normalized[CONF_CHANGE_AMOUNT] = override_max_change_amount(change_value, len(lights))
 
     transition_ok, transition_value = is_number_or_list(
         normalized.get(CONF_TRANSITION), TRANSITION_MIN, TRANSITION_MAX
@@ -459,7 +462,10 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
     if not brightness_ok:
         raise vol.Invalid(ERROR_BRIGHTNESS_NOT_INT_OR_RANGE)
     normalized[CONF_BRIGHTNESS] = brightness_value
-    normalized[CONF_PRIORITY] = round(normalized.get(CONF_PRIORITY, DEFAULT_PRIORITY))
+    try:
+        normalized[CONF_PRIORITY] = round(normalized.get(CONF_PRIORITY, DEFAULT_PRIORITY))
+    except TypeError as err:
+        raise vol.Invalid("priority must be a number") from err
     return normalized
 
 

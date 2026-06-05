@@ -13,6 +13,7 @@ from custom_components.animated_scenes.const import (
     CONF_COLOR_RGB_DICT,
     CONF_COLORS,
     CONF_ENTITY_TYPE,
+    CONF_PRIORITY,
     CONF_TRANSITION,
     DEFAULT_ANIMATE_BRIGHTNESS,
     DEFAULT_ANIMATE_COLOR,
@@ -128,6 +129,8 @@ def test_normalize_scene_input_accepts_fractional_runtime_timings() -> None:
         ("transition", "[1, bad]", "transition_not_int_or_range"),
         ("change_frequency", "61", "change_frequency_not_int_or_range"),
         (CONF_BRIGHTNESS, "300", "brightness_not_int_or_range"),
+        (CONF_LIGHTS, None, "must_select_lights"),
+        (CONF_PRIORITY, "high", "priority must be a number"),
     ],
 )
 def test_normalize_scene_input_reports_specific_errors(

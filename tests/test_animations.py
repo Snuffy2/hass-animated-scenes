@@ -297,6 +297,25 @@ async def test_start_service_accepts_text_change_amount(
     assert manager.animations == {}
 
 
+@pytest.mark.parametrize(
+    "invalid_data",
+    [
+        {CONF_LIGHTS: None},
+        {"priority": "high"},
+    ],
+)
+def test_validate_start_converts_normalization_errors_to_integration_error(
+    hass: HomeAssistant, invalid_data: dict[str, object]
+) -> None:
+    """Report malformed service data with IntegrationError instead of raw exceptions."""
+    manager = Animations(hass)
+    data = _animation_config("Spooky", ["light.one"])
+    data.update(invalid_data)
+
+    with pytest.raises(IntegrationError, match="Service data did not match schema"):
+        manager.validate_start(data)
+
+
 @pytest.mark.asyncio
 async def test_manager_stop_by_name_stops_running_animation(hass: HomeAssistant) -> None:
     """Stop a named animation without requiring service-call validation.
