@@ -60,6 +60,9 @@ def test_post_coverage_workflow_skips_prs_without_comment_artifacts() -> None:
 
     assert "Check coverage comment eligibility" in workflow
     assert "github.rest.pulls.get" in workflow
+    assert "github.rest.actions.listWorkflowRunArtifacts" in workflow
+    assert "artifact.name === 'python-coverage-comment-action'" in workflow
+    assert "hasCommentArtifact &&" in workflow
     assert "labels.includes('dependencies')" in workflow
     assert "pullRequest.user?.type !== 'Bot'" in workflow
     assert "if: steps.coverage_eligibility.outputs.should_post == 'true'" in workflow

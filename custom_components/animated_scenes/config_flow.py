@@ -107,14 +107,17 @@ async def _async_build_schema(
         """Get default value for key."""
         return user_input.get(key, default_dict.get(key, fallback_default))
 
-    build_schema = vol.Schema({})
+    build_schema = vol.Schema(
+        {
+            vol.Required(
+                CONF_NAME,
+                default=_get_default(CONF_NAME),
+            ): selector.TextSelector(selector.TextSelectorConfig()),
+        }
+    )
     if not options_flow:
         build_schema = build_schema.extend(
             {
-                vol.Required(
-                    CONF_NAME,
-                    default=_get_default(CONF_NAME),
-                ): selector.TextSelector(selector.TextSelectorConfig()),
                 vol.Optional(
                     CONF_ICON, default=_get_default(CONF_ICON, DEFAULT_ICON)
                 ): selector.IconSelector(selector.IconSelectorConfig()),

@@ -43,10 +43,22 @@ jobs:
               repo,
               pull_number: prNumber,
             });
+            const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner,
+              repo,
+              run_id: context.payload.workflow_run.id,
+            });
             const labels = pullRequest.labels.map((label) => label.name);
+            const hasCommentArtifact = artifacts.artifacts.some(
+              (artifact) =>
+                artifact.name === 'python-coverage-comment-action' && !artifact.expired,
+            );
             const shouldPost =
-              !labels.includes('dependencies') && pullRequest.user?.type !== 'Bot';
+              hasCommentArtifact &&
+              !labels.includes('dependencies') &&
+              pullRequest.user?.type !== 'Bot';
 
+            core.setOutput('has_artifact', String(hasCommentArtifact));
             core.setOutput('should_post', String(shouldPost));
 
       - name: Post coverage Comment to PR

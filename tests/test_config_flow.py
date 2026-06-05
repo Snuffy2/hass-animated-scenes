@@ -26,6 +26,12 @@ from custom_components.animated_scenes.const import (
 )
 
 
+def _schema_has_key(data_schema: object, key: str) -> bool:
+    """Return whether a voluptuous schema includes a top-level key."""
+    schema = getattr(data_schema, "schema", {})
+    return any(getattr(marker, "schema", marker) == key for marker in schema)
+
+
 async def test_options_rgb_ui_handles_empty_existing_color_dict(hass: HomeAssistant) -> None:
     """Show the first RGB color form when stored color data is empty.
 
@@ -56,6 +62,33 @@ async def test_options_rgb_ui_handles_empty_existing_color_dict(hass: HomeAssist
     assert result["step_id"] == "color_rgb_ui"
 
 
+async def test_options_scene_form_exposes_name_for_rename(hass: HomeAssistant) -> None:
+    """Expose the scene name in options so users can submit renames."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Spooky",
+        data={
+            CONF_NAME: "Spooky",
+            CONF_ENTITY_TYPE: ENTITY_SCENE,
+            CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_YAML,
+            CONF_LIGHTS: ["light.one"],
+            CONF_TRANSITION: 1,
+            "change_frequency": 1,
+            "change_amount": "all",
+            "brightness": 255,
+        },
+        entry_id="spooky",
+    )
+    entry.add_to_hass(hass)
+    flow = AnimatedScenesOptionsFlowHandler(entry)
+    flow.hass = hass
+
+    result = await flow.async_step_init()
+
+    assert result["type"] == "form"
+    assert _schema_has_key(result["data_schema"], CONF_NAME)
+
+
 async def test_options_rename_stops_previous_animation_before_reload(
     hass: HomeAssistant,
 ) -> None:
@@ -81,27 +114,18 @@ async def test_options_rename_stops_previous_animation_before_reload(
     entry.add_to_hass(hass)
     flow = AnimatedScenesOptionsFlowHandler(entry)
     flow.hass = hass
-    flow._data.update(
-        {
-            CONF_NAME: "Scary",
-            CONF_ENTITY_TYPE: ENTITY_SCENE,
-            CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_YAML,
-            CONF_LIGHTS: ["light.one"],
-            CONF_TRANSITION: 1,
-            "change_frequency": 1,
-            "change_amount": "all",
-            "brightness": 255,
-        }
-    )
 
     with (
         patch.object(manager, "stop_by_name", AsyncMock()) as stop_by_name,
         patch.object(hass.config_entries, "async_reload", AsyncMock()) as reload_entry,
     ):
+        scene_result = await flow.async_step_scene({CONF_NAME: "Scary"})
         result = await flow.async_step_color_yaml(
             {CONF_COLORS: [{"color_type": "rgb_color", "color": [255, 0, 0]}]}
         )
 
+    assert scene_result["type"] == "form"
+    assert scene_result["step_id"] == "color_yaml"
     stop_by_name.assert_awaited_once_with("Spooky")
     reload_entry.assert_awaited_once_with("spooky")
     assert entry.title == "Scary"
