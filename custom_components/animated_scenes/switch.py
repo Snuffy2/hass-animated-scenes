@@ -15,13 +15,13 @@ import voluptuous as vol
 from homeassistant.components.switch import ENTITY_ID_FORMAT, SwitchEntity
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_BRIGHTNESS, CONF_ICON, CONF_LIGHTS, CONF_NAME, MATCH_ALL
-from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, HomeAssistant
+from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, Event, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.util import slugify
 
-from .animations import START_SERVICE_CONFIG, Animations
+from .animations import Animations
 from .const import (
     COLOR_SELECTOR_RGB_UI,
     CONF_ANIMATE_BRIGHTNESS,
@@ -29,10 +29,8 @@ from .const import (
     CONF_CHANGE_AMOUNT,
     CONF_CHANGE_FREQUENCY,
     CONF_CHANGE_SEQUENCE,
-    CONF_COLOR_RGB,
     CONF_COLOR_RGB_DICT,
     CONF_COLOR_SELECTOR_MODE,
-    CONF_COLOR_TYPE,
     CONF_COLORS,
     CONF_ENTITY_TYPE,
     CONF_IGNORE_OFF,
@@ -42,8 +40,12 @@ from .const import (
     CONF_RESTORE_POWER,
     CONF_TRANSITION,
     DOMAIN,
+    EVENT_NAME_CHANGE,
+    EVENT_STATE_STARTED,
+    EVENT_STATE_STOPPED,
     INTEGRATION_NAME,
 )
+from .scene_config import START_SERVICE_CONFIG, build_colors_from_rgb_dict
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -129,8 +131,9 @@ class AnimatedSceneSwitch(SwitchEntity):
     def __init__(self, hass: HomeAssistant, config: ConfigType, unique_id: str) -> None:
         """Initialize the AnimatedSceneSwitch entity.
 
-        Store the provided configuration and schedule async setup of
-        derived animation fields.
+        Store the provided configuration and prepare derived animation fields
+        immediately so the entity can be turned on as soon as Home Assistant
+        adds it.
         """
 
         _LOGGER.debug("[AnimatedSceneSwitch init] config: %s", config)
@@ -142,40 +145,27 @@ class AnimatedSceneSwitch(SwitchEntity):
         self._attr_is_on: bool = False
         self.entity_id = ENTITY_ID_FORMAT.format(slugify(f"{DOMAIN}_{self._attr_name}"))
         self._attr_unique_id: str = unique_id
-        self._animation_config: dict[str, Any] = {}
-        hass.async_create_task(self._async_setup_animation_fields())
+        self._animation_config: dict[str, Any] = self._build_animation_config()
 
-    async def _async_setup_animation_fields(self) -> None:
-        """Asynchronously prepare derived animation configuration fields.
+    def _build_animation_config(self) -> dict[str, Any]:
+        """Build runtime animation configuration from config-entry data.
 
-        This builds color lists when RGB UI mode is used and strips out
-        platform-specific keys from a working animation configuration.
+        Returns:
+            A deep-copied service configuration with entity-only metadata and
+            UI-only color selector fields removed.
         """
 
         if self._config.get(CONF_COLOR_SELECTOR_MODE, None) == COLOR_SELECTOR_RGB_UI:
-            await self._async_build_colors_from_rgb_dict()
-        self._animation_config = copy.deepcopy(self._config)
-        self._animation_config.pop(CONF_PLATFORM, None)
-        self._animation_config.pop(CONF_ICON, None)
-        self._animation_config.pop(CONF_ENTITY_TYPE, None)
-        self._animation_config.pop(CONF_COLOR_RGB_DICT, None)
-        self._animation_config.pop(CONF_COLOR_SELECTOR_MODE, None)
-        # _LOGGER.debug(f"[async_setup_animation_fields] config: {self._config}")
-        # _LOGGER.debug(f"[async_setup_animation_fields] animation_config: {self._animation_config}")
-
-    async def _async_build_colors_from_rgb_dict(self) -> None:
-        """Build a colors list from a color RGB dictionary in the config.
-
-        Converts the stored RGB dict into a list of color mappings and marks
-        each entry as an RGB color type so the rest of the code can use a
-        unified `CONF_COLORS` structure.
-        """
-
-        color_list = list(copy.deepcopy(self._config.get(CONF_COLOR_RGB_DICT, {})).values())
-        for color in color_list:
-            color.update({CONF_COLOR_TYPE: CONF_COLOR_RGB})
-        # _LOGGER.debug(f"[async_build_colors_from_rgb_dict] color_list: {color_list}")
-        self._config.update({CONF_COLORS: color_list})
+            self._config[CONF_COLORS] = build_colors_from_rgb_dict(
+                self._config.get(CONF_COLOR_RGB_DICT, {})
+            )
+        animation_config = copy.deepcopy(self._config)
+        animation_config.pop(CONF_PLATFORM, None)
+        animation_config.pop(CONF_ICON, None)
+        animation_config.pop(CONF_ENTITY_TYPE, None)
+        animation_config.pop(CONF_COLOR_RGB_DICT, None)
+        animation_config.pop(CONF_COLOR_SELECTOR_MODE, None)
+        return animation_config
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -200,6 +190,52 @@ class AnimatedSceneSwitch(SwitchEntity):
             CONF_LIGHTS: self._config.get(CONF_LIGHTS),
             CONF_COLORS: self._config.get(CONF_COLORS),
         }
+
+    @property
+    def is_on(self) -> bool:
+        """Return whether the animated scene is currently active.
+
+        Returns:
+            True when the switch has observed a start event or was turned on
+            locally; false after a stop event or local turn-off.
+        """
+
+        return self._attr_is_on
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe the switch to animation lifecycle events.
+
+        Returns:
+            None. The listener removal callback is registered with Home
+            Assistant so it is cleaned up automatically when the entity unloads.
+        """
+
+        self.async_on_remove(
+            self.hass.bus.async_listen(EVENT_NAME_CHANGE, self._handle_animation_event)
+        )
+
+    @callback
+    def _handle_animation_event(self, event: Event) -> None:
+        """Update switch state when this scene starts or stops.
+
+        Args:
+            event: Home Assistant event containing the animation name and
+                lifecycle state.
+
+        Returns:
+            None. Unrelated animation events are ignored.
+        """
+
+        if event.data.get("animation") != self._attr_name:
+            return
+        state = event.data.get("state")
+        if state == EVENT_STATE_STARTED:
+            self._attr_is_on = True
+        elif state == EVENT_STATE_STOPPED:
+            self._attr_is_on = False
+        else:
+            return
+        self.async_write_ha_state()
 
     async def async_turn_on(self, **_: Any) -> None:
         """Turn the switch on and start the corresponding animation.
