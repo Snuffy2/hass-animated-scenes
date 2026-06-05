@@ -191,7 +191,14 @@ class AnimatedSceneSwitch(SwitchEntity):
         The attributes expose the animation configuration options for
         inspection in the UI.
         """
-        return {key: self._config.get(key) for key in EXTRA_STATE_ATTRIBUTE_KEYS}
+        return {
+            key: (
+                self._animation_config[key]
+                if key in self._animation_config
+                else self._config.get(key)
+            )
+            for key in EXTRA_STATE_ATTRIBUTE_KEYS
+        }
 
     @property
     def is_on(self) -> bool:

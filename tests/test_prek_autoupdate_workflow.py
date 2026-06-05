@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import sys
 from types import ModuleType
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import pytest
 
@@ -53,7 +53,11 @@ class FakeCleanupClient:
     def list_pulls(self, *, state: str, max_pages: int | None = None) -> list[dict[str, object]]:
         """Return fake pull requests by state."""
         self.max_pages_by_state[state] = max_pages
-        return self.open_pulls if state == "open" else self.closed_pulls
+        if state == "open":
+            return self.open_pulls
+        if state == "closed":
+            return self.closed_pulls
+        raise ValueError(f"Unsupported pull request state: {state}")
 
     def list_refs(self, *, ref_prefix: str) -> list[str]:
         """Return fake git refs by prefix."""
@@ -186,6 +190,32 @@ def test_workflow_runs_updates_weekly_and_cleanup_daily() -> None:
     assert "github.event.schedule == '0 2 * * 1'" not in workflow_text
     assert "should_update=true" in workflow_text
     assert "name: Nightly Cleanup" in workflow_text
+
+
+def test_workflow_scopes_write_permissions_to_jobs() -> None:
+    """Workflow should not grant write permissions globally."""
+    workflow_text = WORKFLOW_PATH.read_text()
+
+    top_level_text = workflow_text.split("jobs:", maxsplit=1)[0]
+    assert "permissions:" not in top_level_text
+    assert workflow_text.count("permissions:") == 2
+
+
+def test_workflow_cancels_overlapping_runs() -> None:
+    """Workflow should cancel older runs before a new cleanup starts."""
+    workflow_text = WORKFLOW_PATH.read_text()
+
+    assert "concurrency:" in workflow_text
+    assert "group: prek-autoupdate-${{ github.repository }}" in workflow_text
+    assert "cancel-in-progress: true" in workflow_text
+
+
+def test_fake_cleanup_client_rejects_unknown_pull_states() -> None:
+    """Fake client should fail fast when tests pass an unexpected PR state."""
+    client = FakeCleanupClient(open_pulls=[], closed_pulls=[])
+
+    with pytest.raises(ValueError, match="Unsupported pull request state: merged"):
+        client.list_pulls(state="merged")
 
 
 def test_cleanup_script_closes_stale_prs_and_deletes_workflow_branches(
@@ -575,3 +605,37 @@ def test_github_client_list_refs_treats_missing_prefix_as_empty(
     client = cleanup_script.GithubClient(repository=REPOSITORY, token="token")  # noqa: S106
 
     assert client.list_refs(ref_prefix="heads/missing") == []
+
+
+def test_main_logs_network_errors(
+    cleanup_script: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """CLI entry point should convert GitHub network failures into exit code 1."""
+
+    def fail_cleanup(**_kwargs: object) -> object:
+        """Raise a network error from the cleanup routine."""
+        raise URLError("timed out")
+
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+    monkeypatch.setattr(cleanup_script, "cleanup_update_branches", fail_cleanup)
+
+    with caplog.at_level("ERROR"):
+        exit_code = cleanup_script.main(
+            [
+                "--repository",
+                REPOSITORY,
+                "--branch",
+                WORKFLOW_BRANCH,
+                "--branch-prefix",
+                WORKFLOW_BRANCH,
+                "--label-name",
+                WORKFLOW_LABEL,
+            ]
+        )
+
+    assert exit_code == 1
+    assert f"Failed to clean prek update branches for {REPOSITORY} branch {WORKFLOW_BRANCH}" in (
+        caplog.text
+    )

@@ -120,6 +120,24 @@ async def test_switch_animation_config_does_not_mutate_source_config(
     ]
 
 
+def test_switch_extra_state_attributes_use_runtime_config(hass: HomeAssistant) -> None:
+    """Expose normalized runtime values in switch state attributes."""
+    config = _switch_config()
+    config[CONF_COLORS] = [{"stale": True}]
+
+    switch = AnimatedSceneSwitch(hass, config, "entry-id")
+
+    assert switch.extra_state_attributes is not None
+    assert switch.extra_state_attributes[CONF_COLORS] == [
+        {
+            "color": [255, 0, 0],
+            "brightness": 255,
+            "weight": 10,
+            "color_type": "rgb_color",
+        }
+    ]
+
+
 def test_switch_exposes_animated_scenes_device_info(hass: HomeAssistant) -> None:
     """Group switch entities under the Animated Scenes device."""
     switch = AnimatedSceneSwitch(hass, _switch_config(), "entry-id")

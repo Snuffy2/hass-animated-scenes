@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 from typing import Protocol
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -510,20 +510,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     client = GithubClient(repository=args.repository, token=token)
-    result = cleanup_update_branches(
-        client=client,
-        repository=args.repository,
-        branch=args.branch,
-        branch_prefix=args.branch_prefix,
-        label_name=args.label_name,
-        author_login=args.author_login,
-        body_marker=args.body_marker,
-        keep_pr_number=args.keep_pr_number,
-        keep_latest_open_pr=args.keep_latest_open_pr,
-        close_stale_prs=args.close_stale_prs,
-        delete_stale_branches=args.delete_stale_branches,
-        delete_merged_branches=args.delete_merged_branches,
-    )
+    try:
+        result = cleanup_update_branches(
+            client=client,
+            repository=args.repository,
+            branch=args.branch,
+            branch_prefix=args.branch_prefix,
+            label_name=args.label_name,
+            author_login=args.author_login,
+            body_marker=args.body_marker,
+            keep_pr_number=args.keep_pr_number,
+            keep_latest_open_pr=args.keep_latest_open_pr,
+            close_stale_prs=args.close_stale_prs,
+            delete_stale_branches=args.delete_stale_branches,
+            delete_merged_branches=args.delete_merged_branches,
+        )
+    except (HTTPError, URLError, TimeoutError) as err:
+        LOGGER.error(
+            "Failed to clean prek update branches for %s branch %s: %s",
+            args.repository,
+            args.branch,
+            err,
+        )
+        return 1
     LOGGER.info("Closed stale PRs: %s", result.closed_prs or "none")
     LOGGER.info("Deleted branches: %s", result.deleted_branches or "none")
     return 0
