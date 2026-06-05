@@ -12,7 +12,6 @@ from homeassistant.components.light import (
     ATTR_RGBW_COLOR,
     ATTR_RGBWW_COLOR,
     ATTR_XY_COLOR,
-    VALID_TRANSITION,
 )
 from homeassistant.const import CONF_BRIGHTNESS, CONF_LIGHTS, CONF_NAME
 import homeassistant.helpers.config_validation as cv
@@ -84,13 +83,22 @@ SCENE_DEFAULTS: dict[str, Any] = {
     CONF_PRIORITY: DEFAULT_PRIORITY,
 }
 
+BRIGHTNESS_VALUE_SCHEMA = vol.All(
+    vol.Coerce(float),
+    vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
+    lambda value: int(value) if value.is_integer() else vol.Invalid("brightness must be an int"),
+)
+TRANSITION_VALUE_SCHEMA = vol.All(
+    vol.Coerce(float), vol.Range(min=TRANSITION_MIN, max=TRANSITION_MAX)
+)
+
 COLOR_GROUP_SCHEMA = {
     vol.Optional(CONF_BRIGHTNESS, default=DEFAULT_BRIGHTNESS): vol.Any(
-        vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
+        BRIGHTNESS_VALUE_SCHEMA,
         vol.ExactSequence(
             (
-                vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
-                vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
+                BRIGHTNESS_VALUE_SCHEMA,
+                BRIGHTNESS_VALUE_SCHEMA,
             )
         ),
     ),
@@ -108,17 +116,17 @@ START_SERVICE_CONFIG = {
     vol.Optional(CONF_RESTORE, default=DEFAULT_RESTORE): bool,
     vol.Optional(CONF_RESTORE_POWER, default=DEFAULT_RESTORE_POWER): bool,
     vol.Optional(CONF_BRIGHTNESS, default=DEFAULT_BRIGHTNESS): vol.Any(
-        vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
+        BRIGHTNESS_VALUE_SCHEMA,
         vol.ExactSequence(
             (
-                vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
-                vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
+                BRIGHTNESS_VALUE_SCHEMA,
+                BRIGHTNESS_VALUE_SCHEMA,
             )
         ),
     ),
     vol.Optional(CONF_TRANSITION, default=DEFAULT_TRANSITION): vol.Any(
-        VALID_TRANSITION,
-        vol.ExactSequence((VALID_TRANSITION, VALID_TRANSITION)),
+        TRANSITION_VALUE_SCHEMA,
+        vol.ExactSequence((TRANSITION_VALUE_SCHEMA, TRANSITION_VALUE_SCHEMA)),
     ),
     vol.Optional(CONF_CHANGE_FREQUENCY, default=DEFAULT_CHANGE_FREQUENCY): vol.Any(
         vol.All(vol.Coerce(float), vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX)),

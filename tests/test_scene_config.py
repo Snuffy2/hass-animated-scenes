@@ -149,6 +149,20 @@ def test_validate_start_service_data_accepts_normalized_scene_data() -> None:
     assert result[CONF_CHANGE_AMOUNT] == "all"
 
 
+def test_validate_start_service_data_accepts_templated_numeric_strings() -> None:
+    """Accept string numeric values from automations before runtime startup."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_BRIGHTNESS] = "255"
+    data[CONF_TRANSITION] = "0.5"
+    data[CONF_CHANGE_FREQUENCY] = "0.5"
+
+    result = validate_start_service_data(data)
+
+    assert result[CONF_BRIGHTNESS] == 255
+    assert result[CONF_TRANSITION] == 0.5
+    assert result[CONF_CHANGE_FREQUENCY] == 0.5
+
+
 @pytest.mark.parametrize(
     CONF_CHANGE_FREQUENCY,
     [
