@@ -737,15 +737,9 @@ class Animation:
 
     async def update_lights(self) -> None:
         """Select lights to update this tick and apply updates concurrently."""
-        if isinstance(self._change_amount, str):
-            if self._change_amount == "all":
-                change_amount: float = len(self._active_lights)
-            else:
-                return
-        else:
-            change_amount = self.get_static_or_random(self._change_amount)
-            if change_amount <= 0:
-                return
+        change_amount = self.get_change_amount()
+        if change_amount <= 0 and self._change_amount != "all":
+            return
 
         lights_to_change: list = self.pick_lights(int(change_amount))
         if self._sequence:

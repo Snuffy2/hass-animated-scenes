@@ -115,6 +115,27 @@ def _validate_yaml_runtime_data(data: dict[str, Any]) -> None:
     validate_start_service_data(runtime_data)
 
 
+def _validate_color_yaml_data(data: dict[str, Any]) -> str | None:
+    """Return a color YAML validation error key, or None when valid.
+
+    Args:
+        data: Scene configuration containing YAML color data.
+
+    Returns:
+        Translation key for the validation error, or None when valid.
+
+    """
+    if data.get(CONF_COLORS) in (None, {}, []):
+        return ERROR_COLORS_IS_BLANK
+    if not isinstance(data.get(CONF_COLORS), list):
+        return ERROR_COLORS_MALFORMED
+    try:
+        _validate_yaml_runtime_data(data)
+    except vol.Invalid:
+        return ERROR_COLORS_MALFORMED
+    return None
+
+
 def _schema_default(
     user_input: dict[str, Any],
     default_dict: dict[str, Any],
@@ -445,15 +466,8 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._data.update(user_input)
-            if self._data.get(CONF_COLORS) in (None, {}, []):
-                errors["base"] = ERROR_COLORS_IS_BLANK
-            elif not isinstance(self._data.get(CONF_COLORS), list):
-                errors["base"] = ERROR_COLORS_MALFORMED
-            else:
-                try:
-                    _validate_yaml_runtime_data(self._data)
-                except vol.Invalid:
-                    errors["base"] = ERROR_COLORS_MALFORMED
+            if error := _validate_color_yaml_data(self._data):
+                errors["base"] = error
             if not errors:
                 return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
         return self.async_show_form(
@@ -591,15 +605,8 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
 
         if user_input is not None:
             self._data.update(user_input)
-            if self._data.get(CONF_COLORS) in (None, {}, []):
-                errors["base"] = ERROR_COLORS_IS_BLANK
-            elif not isinstance(self._data.get(CONF_COLORS), list):
-                errors["base"] = ERROR_COLORS_MALFORMED
-            else:
-                try:
-                    _validate_yaml_runtime_data(self._data)
-                except vol.Invalid:
-                    errors["base"] = ERROR_COLORS_MALFORMED
+            if error := _validate_color_yaml_data(self._data):
+                errors["base"] = error
             if not errors:
                 self._data.update({CONF_COLOR_RGB_DICT: {}})
                 await self._async_stop_previous_animation_if_renamed()
