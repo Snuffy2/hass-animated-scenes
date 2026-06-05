@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import IntegrationError
 import pytest
 
 from custom_components.animated_scenes.animations import Animations
@@ -116,6 +117,24 @@ async def test_switch_turn_on_stays_off_for_one_shot_scene(hass: HomeAssistant) 
     switch = AnimatedSceneSwitch(hass, config, "entry-id")
 
     await switch.async_turn_on()
+
+    assert switch.is_on is False
+    assert manager.animations == {}
+
+
+@pytest.mark.asyncio
+async def test_switch_rejects_empty_rgb_ui_colors_before_animation_loop(
+    hass: HomeAssistant,
+) -> None:
+    """Reject empty RGB UI color storage before random color selection runs."""
+    manager = Animations(hass)
+    Animations.instance = manager
+    config = _switch_config()
+    config[CONF_COLOR_RGB_DICT] = {}
+    switch = AnimatedSceneSwitch(hass, config, "entry-id")
+
+    with pytest.raises(IntegrationError):
+        await switch.async_turn_on()
 
     assert switch.is_on is False
     assert manager.animations == {}

@@ -141,6 +141,15 @@ def test_validate_start_service_data_rejects_malformed_colors() -> None:
         validate_start_service_data(data)
 
 
+def test_validate_start_service_data_rejects_empty_colors() -> None:
+    """Reject runtime configs that cannot pick an initial color."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_COLORS] = []
+
+    with pytest.raises(vol.Invalid):
+        validate_start_service_data(data)
+
+
 @pytest.mark.parametrize("value", [-1, "-1", 61, "61"])
 def test_validate_start_service_data_rejects_out_of_range_frequency(value: object) -> None:
     """Reject public service frequencies outside the runtime sleep bounds."""

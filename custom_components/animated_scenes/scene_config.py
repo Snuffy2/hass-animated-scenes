@@ -135,6 +135,7 @@ START_SERVICE_CONFIG = {
     vol.Required(CONF_LIGHTS): cv.entity_ids,
     vol.Optional(CONF_COLORS, default=[]): vol.All(
         cv.ensure_list,
+        vol.Length(min=1),
         [
             vol.Any(
                 vol.Schema(
