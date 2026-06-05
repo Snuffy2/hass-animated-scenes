@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from custom_components.animated_scenes import async_setup
+from custom_components.animated_scenes import async_setup, async_unload_entry
 from custom_components.animated_scenes.animations import Animation, Animations
-from custom_components.animated_scenes.const import DOMAIN
+from custom_components.animated_scenes.const import CONF_ENTITY_TYPE, DOMAIN, ENTITY_SCENE
 from custom_components.animated_scenes.scene_config import (
     ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA,
     REMOVE_LIGHTS_SERVICE_SCHEMA,
     START_SERVICE_SCHEMA,
     STOP_SERVICE_SCHEMA,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 
@@ -47,6 +48,29 @@ def _animation_config(name: str, lights: list[str], priority: int = 0) -> dict[s
         "animate_color": True,
         "priority": priority,
     }
+
+
+def _scene_entry() -> ConfigEntry:
+    """Return a scene config entry for unload lifecycle tests.
+
+    Returns:
+        A Home Assistant ``ConfigEntry`` carrying the minimal Animated Scenes
+        scene data needed by ``async_unload_entry``.
+    """
+
+    return ConfigEntry(
+        version=1,
+        minor_version=1,
+        domain=DOMAIN,
+        title="Spooky",
+        data={CONF_ENTITY_TYPE: ENTITY_SCENE, "name": "Spooky"},
+        discovery_keys={},
+        options={},
+        source="user",
+        subentries_data={},
+        unique_id=None,
+        entry_id="entry-spooky",
+    )
 
 
 @pytest.mark.asyncio
@@ -155,3 +179,127 @@ async def test_release_light_skip_ownership_keeps_remaining_owner(
     assert manager.light_owner["light.one"] is remaining
     assert manager._light_animations["light.one"] == [remaining]  # noqa: SLF001
     assert "light.one" in manager.states
+
+
+@pytest.mark.asyncio
+async def test_manager_stop_by_name_stops_running_animation(hass: HomeAssistant) -> None:
+    """Stop a named animation without requiring service-call validation.
+
+    Config-entry unload already has a trusted entry title/name, so it should be
+    able to stop the matching runtime animation directly instead of fabricating
+    service data for the public ``stop_animation`` handler.
+    """
+
+    manager = Animations(hass)
+    animation = AsyncMock()
+    animation.name = "Spooky"
+    manager.animations["Spooky"] = animation
+
+    await manager.stop_by_name("Spooky")
+
+    animation.stop.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_unload_entry_stops_scene_animation(hass: HomeAssistant) -> None:
+    """Stop a running scene animation before unloading its config entry.
+
+    A scene entity can be removed or reloaded while its animation is active.
+    Unload must stop that runtime task so it does not continue controlling
+    lights after Home Assistant removes the config entry's platform entity.
+    """
+
+    manager = Animations(hass)
+    Animations.instance = manager
+    animation = AsyncMock()
+    animation.name = "Spooky"
+    manager.animations["Spooky"] = animation
+    entry = _scene_entry()
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = dict(entry.data)
+
+    with patch.object(hass.config_entries, "async_unload_platforms", return_value=True):
+        assert await async_unload_entry(hass, entry) is True
+
+    animation.stop.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistant) -> None:
+    """Avoid double-stop or double-delete when a stopped animation releases itself.
+
+    Real animations remove themselves from ``manager.animations`` during their
+    stop/release path. Last-entry unload must tolerate that self-cleanup before
+    the final manager-wide teardown runs.
+    """
+
+    class ReleasingAnimation:
+        """Animation stub that follows the real manager release contract."""
+
+        name = "Spooky"
+
+        def __init__(self, manager: Animations) -> None:
+            """Store the manager and initialize stop accounting.
+
+            Args:
+                manager: Runtime manager that owns this stub animation.
+            """
+
+            self.manager = manager
+            self.stop_count = 0
+
+        async def stop(self) -> None:
+            """Record one stop call and release from the manager.
+
+            Returns:
+                None. The method mirrors the real animation path that calls
+                ``release_animation`` before control returns to unload cleanup.
+            """
+
+            self.stop_count += 1
+            self.manager.release_animation(self)
+
+    manager = Animations(hass)
+    Animations.instance = manager
+    animation = ReleasingAnimation(manager)
+    manager.animations["Spooky"] = animation
+    manager.states["light.one"] = object()
+    manager.light_owner["light.one"] = animation  # type: ignore[assignment]
+    manager._light_animations["light.one"] = [animation]  # noqa: SLF001
+    entry = _scene_entry()
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = dict(entry.data)
+
+    with patch.object(hass.config_entries, "async_unload_platforms", return_value=True):
+        assert await async_unload_entry(hass, entry) is True
+
+    assert animation.stop_count == 1
+    assert manager.animations == {}
+    assert manager.states == {}
+    assert manager.light_owner == {}
+    assert manager._light_animations == {}  # noqa: SLF001
+    assert Animations.instance is None
+
+
+@pytest.mark.asyncio
+async def test_unload_entry_keeps_animation_when_platform_unload_fails(
+    hass: HomeAssistant,
+) -> None:
+    """Keep runtime animation active when Home Assistant cannot unload the entry.
+
+    If platform unload fails, Home Assistant still considers the config entry
+    loaded. Runtime cleanup must therefore wait until ``async_unload_platforms``
+    succeeds.
+    """
+
+    manager = Animations(hass)
+    Animations.instance = manager
+    animation = AsyncMock()
+    animation.name = "Spooky"
+    manager.animations["Spooky"] = animation
+    entry = _scene_entry()
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = dict(entry.data)
+
+    with patch.object(hass.config_entries, "async_unload_platforms", return_value=False):
+        assert await async_unload_entry(hass, entry) is False
+
+    animation.stop.assert_not_awaited()
+    assert hass.data[DOMAIN][entry.entry_id]["name"] == "Spooky"

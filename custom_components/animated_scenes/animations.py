@@ -924,6 +924,50 @@ class Animations:
         if id_name in self.animations:
             await self.animations[id_name].stop()
 
+    async def stop_by_name(self, name: str) -> None:
+        """Stop a running animation by its runtime name.
+
+        Args:
+            name: Animation name stored in ``self.animations``.
+
+        Returns:
+            None. Missing names are ignored because unload/reload cleanup can
+            race with service-driven stops.
+        """
+
+        animation = self.animations.get(name)
+        if animation is not None:
+            await animation.stop()
+            self.animations.pop(name, None)
+
+    async def stop_all(self) -> None:
+        """Stop every animation currently managed by this integration.
+
+        Returns:
+            None. The method snapshots current animations before awaiting so
+            individual stop calls can mutate the manager safely.
+        """
+
+        animations = list(self.animations.values())
+        await asyncio.gather(*(animation.stop() for animation in animations))
+
+    def clear_runtime_state(self) -> None:
+        """Clear listeners and all runtime ownership maps.
+
+        Returns:
+            None. This is intended for full integration teardown after all
+            config entries have unloaded.
+        """
+
+        if self._external_light_listener is not None:
+            self._external_light_listener()
+            self._external_light_listener = None
+        self.animations.clear()
+        self.states.clear()
+        self._light_animations.clear()
+        self.light_owner.clear()
+        self._conflicted_lights.clear()
+
     def refresh_listener(self) -> None:
         """Refresh the external state change listener used to track lights.
 

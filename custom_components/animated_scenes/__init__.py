@@ -107,6 +107,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     """
     _LOGGER.info("Unloading: %s", entry.data)
+    manager = Animations.instance
     unload_ok: bool = False
     if entry.data.get(CONF_ENTITY_TYPE, None) == ENTITY_SCENE:
         unload_ok = await hass.config_entries.async_unload_platforms(
@@ -119,5 +120,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             [Platform.SENSOR],
         )
     if unload_ok:
+        if manager and entry.data.get(CONF_ENTITY_TYPE, ENTITY_SCENE) == ENTITY_SCENE:
+            name = entry.data.get("name")
+            if name:
+                await manager.stop_by_name(name)
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+        if not hass.data.get(DOMAIN):
+            if Animations.instance:
+                await Animations.instance.stop_all()
+                Animations.instance.clear_runtime_state()
+            Animations.instance = None
     return unload_ok
