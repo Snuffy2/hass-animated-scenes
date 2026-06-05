@@ -261,7 +261,7 @@ data:
 ## Development
 
 - Use Python 3.14.
-- Install local development dependencies from `pyproject.toml` with `./.venv/bin/python -m pip install -e ".[dev,lint,test]"`.
+- Install local development dependencies from `pyproject.toml` with `./.venv/bin/python -m pip install --group dev -e .`.
 - Use `prek` for hooks; hook configuration lives in `prek.toml`.
 - This repository intentionally does not use `requirements*.txt` files or `.pre-commit-config.yaml`.
 - Future agent instructions live in `AGENTS.md`.

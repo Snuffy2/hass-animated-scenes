@@ -127,7 +127,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if name:
                 await manager.stop_by_name(name)
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
-        if not hass.data.get(DOMAIN) and Animations.instance:
-            await Animations.instance.stop_all()
-            Animations.instance.clear_runtime_state()
     return unload_ok

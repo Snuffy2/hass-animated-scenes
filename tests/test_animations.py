@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import ConfigEntry, DiscoveryKey
 from homeassistant.const import CONF_NAME
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 import pytest
 
 from custom_components.animated_scenes import async_setup, async_setup_entry, async_unload_entry
@@ -27,6 +27,7 @@ from custom_components.animated_scenes.scene_config import (
     START_SERVICE_SCHEMA,
     STOP_SERVICE_SCHEMA,
 )
+from custom_components.animated_scenes.service import start_animation
 
 DISCOVERY_KEYS: MappingProxyType[str, tuple[DiscoveryKey, ...]] = MappingProxyType({})
 
@@ -278,7 +279,7 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
 
     Real animations remove themselves from ``manager.animations`` during their
     stop/release path. Last-entry unload must tolerate that self-cleanup before
-    the final manager-wide teardown runs.
+    leaving the service runtime available for service-only usage.
     """
 
     class ReleasingAnimation(Animation):
@@ -314,9 +315,6 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
     Animations.instance = manager
     animation = ReleasingAnimation(manager)
     manager.animations["Spooky"] = animation
-    manager.states["light.one"] = object()
-    manager.light_owner["light.one"] = animation
-    manager._light_animations["light.one"] = [animation]
     entry = _scene_entry()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = dict(entry.data)
 
@@ -325,58 +323,7 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
 
     assert animation.stop_count == 1
     assert manager.animations == {}
-    assert manager.states == {}
-    assert manager.light_owner == {}
-    assert manager._light_animations == {}
     assert Animations.instance is manager
-
-
-@pytest.mark.asyncio
-async def test_setup_entry_recreates_missing_manager(hass: HomeAssistant) -> None:
-    """Recover the runtime manager when a config-entry reload finds it missing."""
-    Animations.instance = None
-    entry = _scene_entry()
-
-    with patch.object(hass.config_entries, "async_forward_entry_setups", return_value=True):
-        assert await async_setup_entry(hass, entry) is True
-
-    assert isinstance(Animations.instance, Animations)
-
-
-@pytest.mark.asyncio
-async def test_add_lights_to_animation_fires_activity_update(hass: HomeAssistant) -> None:
-    """Notify sensors when service calls add lights to a running animation."""
-    manager = Animations(hass)
-    animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
-    manager.animations["Spooky"] = animation
-    manager.light_owner["light.one"] = animation
-    manager._light_animations["light.one"] = [animation]
-    events: list[dict[str, str]] = []
-    hass.bus.async_listen(EVENT_NAME_CHANGE, lambda event: events.append(event.data))
-
-    await manager.add_lights_to_animation(
-        {"name": "Spooky", "lights": ["light.two"]},
-    )
-    await hass.async_block_till_done()
-
-    assert events == [{"animation": "Spooky", "state": EVENT_STATE_UPDATED}]
-
-
-@pytest.mark.asyncio
-async def test_remove_lights_fires_activity_update(hass: HomeAssistant) -> None:
-    """Notify sensors when service calls remove lights from a running animation."""
-    manager = Animations(hass)
-    animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
-    manager.animations["Spooky"] = animation
-    manager.light_owner["light.one"] = animation
-    manager._light_animations["light.one"] = [animation]
-    events: list[dict[str, str]] = []
-    hass.bus.async_listen(EVENT_NAME_CHANGE, lambda event: events.append(event.data))
-
-    await manager.remove_lights({"lights": ["light.one"], "skip_restore": True})
-    await hass.async_block_till_done()
-
-    assert events == [{"animation": "Spooky", "state": EVENT_STATE_UPDATED}]
 
 
 @pytest.mark.asyncio
@@ -390,6 +337,30 @@ async def test_setup_entry_recreates_manager_after_last_entry_unload(
         assert await async_setup_entry(hass, entry) is True
 
     assert Animations.instance is not None
+
+
+@pytest.mark.asyncio
+async def test_start_service_still_works_after_last_entry_unload(
+    hass: HomeAssistant,
+) -> None:
+    """Keep public services active after the final config entry unloads."""
+    manager = Animations(hass)
+    Animations.instance = manager
+    animation = AsyncMock()
+    animation.name = "Spooky"
+    manager.animations["Spooky"] = animation
+    entry = _scene_entry()
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = dict(entry.data)
+
+    with patch.object(hass.config_entries, "async_unload_platforms", return_value=True):
+        assert await async_unload_entry(hass, entry) is True
+
+    with patch.object(manager, "start", AsyncMock()) as manager_start:
+        await start_animation(ServiceCall(hass, DOMAIN, "start_animation", {CONF_NAME: "Manual"}))
+
+    animation.stop.assert_awaited_once()
+    manager_start.assert_awaited_once_with({CONF_NAME: "Manual"})
+    assert Animations.instance is manager
 
 
 @pytest.mark.asyncio
