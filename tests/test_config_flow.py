@@ -22,6 +22,7 @@ from custom_components.animated_scenes.const import (
     DOMAIN,
     ENTITY_SCENE,
     ERROR_COLORS_IS_BLANK,
+    ERROR_COLORS_MALFORMED,
 )
 
 
@@ -135,3 +136,36 @@ async def test_options_yaml_rejects_empty_color_list(hass: HomeAssistant) -> Non
     errors = result["errors"]
     assert errors is not None
     assert errors["base"] == ERROR_COLORS_IS_BLANK
+
+
+async def test_options_yaml_rejects_malformed_color_payload(
+    hass: HomeAssistant,
+) -> None:
+    """Reject malformed YAML colors before saving options."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Spooky",
+        data={
+            CONF_NAME: "Spooky",
+            CONF_ENTITY_TYPE: ENTITY_SCENE,
+            CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_YAML,
+            CONF_LIGHTS: ["light.one"],
+            CONF_TRANSITION: 1,
+            "change_frequency": 1,
+            "change_amount": "all",
+            "brightness": 255,
+        },
+        entry_id="spooky",
+    )
+    entry.add_to_hass(hass)
+    flow = AnimatedScenesOptionsFlowHandler(entry)
+    flow.hass = hass
+
+    result = await flow.async_step_color_yaml(
+        {CONF_COLORS: [{"color_type": "rgb_color", "color": [255, 0]}]}
+    )
+
+    assert result["type"] == "form"
+    errors = result["errors"]
+    assert errors is not None
+    assert errors["base"] == ERROR_COLORS_MALFORMED

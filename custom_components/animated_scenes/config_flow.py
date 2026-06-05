@@ -74,6 +74,7 @@ from .scene_config import (
     is_int_or_list,
     list_or_int_to_str,
     normalize_scene_input,
+    validate_start_service_data,
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -81,6 +82,16 @@ COLOR_SELECTOR_OPTION_LIST = [
     selector.SelectOptionDict(label="Use RGB Selectors", value=COLOR_SELECTOR_RGB_UI),
     selector.SelectOptionDict(label="Configure via YAML", value=COLOR_SELECTOR_YAML),
 ]
+
+
+def _validate_yaml_runtime_data(data: dict[str, Any]) -> None:
+    """Validate YAML color data using runtime fields only."""
+    runtime_data = dict(data)
+    runtime_data.pop(CONF_COLOR_RGB_DICT, None)
+    runtime_data.pop(CONF_COLOR_SELECTOR_MODE, None)
+    runtime_data.pop(CONF_ENTITY_TYPE, None)
+    runtime_data.pop(CONF_ICON, None)
+    validate_start_service_data(runtime_data)
 
 
 async def _async_build_schema(
@@ -394,12 +405,17 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._data.update(user_input)
-            if self._data.get(CONF_COLORS) in (None, {}, []):
-                errors["base"] = ERROR_COLORS_IS_BLANK
-            if not isinstance(self._data.get(CONF_COLORS), list):
-                errors["base"] = ERROR_COLORS_MALFORMED
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
+            if self._data.get(CONF_COLORS) in (None, {}, []):
+                errors["base"] = ERROR_COLORS_IS_BLANK
+            elif not isinstance(self._data.get(CONF_COLORS), list):
+                errors["base"] = ERROR_COLORS_MALFORMED
+            else:
+                try:
+                    _validate_yaml_runtime_data(self._data)
+                except vol.Invalid:
+                    errors["base"] = ERROR_COLORS_MALFORMED
             # _LOGGER.debug(f"[async_step_color_yaml] self._data: {self._data}")
             if not errors:
                 return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
@@ -590,12 +606,17 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
 
         if user_input is not None:
             self._data.update(user_input)
-            if self._data.get(CONF_COLORS) in (None, {}, []):
-                errors["base"] = ERROR_COLORS_IS_BLANK
-            if not isinstance(self._data.get(CONF_COLORS), list):
-                errors["base"] = ERROR_COLORS_MALFORMED
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
+            if self._data.get(CONF_COLORS) in (None, {}, []):
+                errors["base"] = ERROR_COLORS_IS_BLANK
+            elif not isinstance(self._data.get(CONF_COLORS), list):
+                errors["base"] = ERROR_COLORS_MALFORMED
+            else:
+                try:
+                    _validate_yaml_runtime_data(self._data)
+                except vol.Invalid:
+                    errors["base"] = ERROR_COLORS_MALFORMED
             # _LOGGER.debug(f"[async_step_color_yaml] self._data: {self._data}")
             if not errors:
                 self._data.update({CONF_COLOR_RGB_DICT: {}})

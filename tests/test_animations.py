@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 from homeassistant.config_entries import ConfigEntry, DiscoveryKey
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import IntegrationError
 import pytest
 
 from custom_components.animated_scenes import async_setup, async_setup_entry, async_unload_entry
@@ -212,6 +213,20 @@ async def test_add_lights_to_animation_fires_update_event(hass: HomeAssistant) -
 
 
 @pytest.mark.asyncio
+async def test_add_lights_to_animation_rejects_missing_switch(
+    hass: HomeAssistant,
+) -> None:
+    """Raise a clean integration error for a missing switch selector."""
+    manager = Animations(hass)
+    Animations.instance = manager
+
+    with pytest.raises(IntegrationError, match="was not found"):
+        await manager.add_lights_to_animation(
+            {"animated_scene_switch": "switch.missing", CONF_LIGHTS: ["light.two"]}
+        )
+
+
+@pytest.mark.asyncio
 async def test_remove_lights_fires_update_event(hass: HomeAssistant) -> None:
     """Notify event-driven entities after removing lights from animations."""
     manager = Animations(hass)
@@ -231,6 +246,24 @@ async def test_remove_lights_fires_update_event(hass: HomeAssistant) -> None:
 
     release_light.assert_awaited_once_with(animation, "light.one", True, True)
     assert {"animation": "Spooky", "state": EVENT_STATE_UPDATED} in events
+
+
+@pytest.mark.asyncio
+async def test_start_clamps_oversized_change_amount(hass: HomeAssistant) -> None:
+    """Normalize service change_amount before the animation loop can sample lights."""
+    manager = Animations(hass)
+    Animations.instance = manager
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+
+    await manager.start(
+        {
+            **_animation_config("Spooky", ["light.one"]),
+            "change_amount": 2,
+            "change_frequency": 0,
+        }
+    )
+
+    assert "Spooky" not in manager.animations
 
 
 @pytest.mark.asyncio

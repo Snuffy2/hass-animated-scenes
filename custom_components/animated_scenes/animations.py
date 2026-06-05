@@ -83,6 +83,7 @@ from .scene_config import (
     REMOVE_LIGHTS_SERVICE_SCHEMA,
     START_SERVICE_SCHEMA,
     STOP_SERVICE_SCHEMA,
+    normalize_scene_input,
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -1092,9 +1093,12 @@ class Animations:
         if config.get(CONF_NAME, None) is not None:
             name: str = config.get(CONF_NAME)
         else:
-            name = self.hass.states.get(config.get(CONF_ANIMATED_SCENE_SWITCH)).attributes.get(
-                ATTR_FRIENDLY_NAME, config.get(CONF_ANIMATED_SCENE_SWITCH)
-            )
+            switch_entity_id = config.get(CONF_ANIMATED_SCENE_SWITCH)
+            switch_state = self.hass.states.get(switch_entity_id)
+            if switch_state is None:
+                _LOGGER.error("Animated Scene Switch %s was not found", switch_entity_id)
+                raise IntegrationError(f"Animated Scene Switch {switch_entity_id} was not found")
+            name = switch_state.attributes.get(ATTR_FRIENDLY_NAME, switch_entity_id)
 
         if name not in self.animations:
             _LOGGER.error("Tried to add a light to an animation that doesn't exist")
@@ -1158,7 +1162,7 @@ class Animations:
         Raises IntegrationError if validation fails.
         """
         try:
-            config = START_SERVICE_SCHEMA(dict(data))
+            config = START_SERVICE_SCHEMA(normalize_scene_input(dict(data)))
         except vol.Invalid as err:
             _LOGGER.exception("Error with received configuration")
             raise IntegrationError("Service data did not match schema") from err
