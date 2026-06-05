@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import IntegrationError
 import pytest
 
 from custom_components.animated_scenes.animations import Animations
@@ -143,7 +143,7 @@ async def test_switch_turn_on_stays_off_for_one_shot_scene(hass: HomeAssistant) 
 
 @pytest.mark.asyncio
 async def test_switch_rejects_empty_rgb_ui_colors_before_animation_loop(
-    hass: HomeAssistant,
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Reject empty RGB UI color storage before random color selection runs."""
     manager = _runtime_manager(hass)
@@ -151,11 +151,12 @@ async def test_switch_rejects_empty_rgb_ui_colors_before_animation_loop(
     config[CONF_COLOR_RGB_DICT] = {}
     switch = AnimatedSceneSwitch(hass, config, "entry-id")
 
-    with pytest.raises(IntegrationError):
+    with caplog.at_level(logging.ERROR):
         await switch.async_turn_on()
 
     assert switch.is_on is False
     assert manager.animations == {}
+    assert "Failed to start animated scene Spooky" in caplog.text
 
 
 @pytest.mark.asyncio
