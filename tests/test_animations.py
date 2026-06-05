@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from contextlib import suppress
 from types import MappingProxyType, SimpleNamespace
 from typing import cast
 from unittest.mock import AsyncMock, patch
@@ -423,6 +425,30 @@ async def test_manager_stop_by_name_releases_running_animation(hass: HomeAssista
     assert manager.states == {}
     assert manager.light_owner == {}
     assert manager._light_animations == {}
+
+
+@pytest.mark.asyncio
+async def test_manager_stop_by_name_cancels_running_animation_task(hass: HomeAssistant) -> None:
+    """Stop the running task before releasing an animation by name."""
+    manager = _runtime_manager(hass)
+    animation = _tracked_animation(hass, manager)
+    animation._weights = [10]
+
+    with patch("custom_components.animated_scenes.animations.safe_call", AsyncMock()):
+        await animation.start()
+
+    try:
+        assert animation._task is not None
+
+        await manager.stop_by_name("Spooky")
+
+        assert animation._task.done()
+        assert manager.animations == {}
+    finally:
+        if animation._task is not None and not animation._task.done():
+            animation._task.cancel()
+            with suppress(asyncio.CancelledError, KeyError):
+                await animation._task
 
 
 @pytest.mark.asyncio
