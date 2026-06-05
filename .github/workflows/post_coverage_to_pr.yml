@@ -25,7 +25,32 @@ jobs:
     steps:
       # DO NOT run actions/checkout here, for security reasons
       # For details, refer to https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+      - name: Check coverage comment eligibility
+        id: coverage_eligibility
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const pullRequests = context.payload.workflow_run.pull_requests || [];
+            if (pullRequests.length === 0) {
+              core.setOutput('should_post', 'false');
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const prNumber = pullRequests[0].number;
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber,
+            });
+            const labels = pullRequest.labels.map((label) => label.name);
+            const shouldPost =
+              !labels.includes('dependencies') && pullRequest.user?.type !== 'Bot';
+
+            core.setOutput('should_post', String(shouldPost));
+
       - name: Post coverage Comment to PR
+        if: steps.coverage_eligibility.outputs.should_post == 'true'
         uses: py-cov-action/python-coverage-comment-action@v3
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

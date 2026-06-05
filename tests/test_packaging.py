@@ -9,6 +9,8 @@ import tomllib
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONST_PATH = REPO_ROOT / "custom_components" / "animated_scenes" / "const.py"
 PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
+POST_COVERAGE_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "post_coverage_to_pr.yml"
+RELEASE_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "release.yml"
 
 
 def _const_version() -> str:
@@ -42,3 +44,22 @@ def test_package_data_includes_runtime_yaml_and_brand_assets() -> None:
 
     assert "*.yaml" in package_data["custom_components.animated_scenes"]
     assert "brand/*.png" in package_data["custom_components.animated_scenes"]
+
+
+def test_release_workflow_updates_static_package_version() -> None:
+    """Keep release automation synchronized with static package metadata."""
+    workflow = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "Update Version in pyproject.toml" in workflow
+    assert 'version = "${{ github.event.release.tag_name }}"' in workflow
+
+
+def test_post_coverage_workflow_skips_prs_without_comment_artifacts() -> None:
+    """Keep the privileged coverage comment workflow aligned with artifact creation."""
+    workflow = POST_COVERAGE_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "Check coverage comment eligibility" in workflow
+    assert "github.rest.pulls.get" in workflow
+    assert "labels.includes('dependencies')" in workflow
+    assert "pullRequest.user?.type !== 'Bot'" in workflow
+    assert "if: steps.coverage_eligibility.outputs.should_post == 'true'" in workflow
