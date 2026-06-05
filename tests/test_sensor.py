@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from homeassistant.core import HomeAssistant
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.animated_scenes.animations import Animations
@@ -17,7 +18,6 @@ from custom_components.animated_scenes.const import (
     EVENT_STATE_STARTED,
 )
 from custom_components.animated_scenes.sensor import AnimatedScenesSensor
-import pytest
 
 
 @pytest.mark.asyncio

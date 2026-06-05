@@ -8,10 +8,12 @@ import voluptuous as vol
 
 from custom_components.animated_scenes.const import (
     CONF_CHANGE_AMOUNT,
+    CONF_CHANGE_FREQUENCY,
     CONF_COLOR_RGB,
     CONF_COLOR_RGB_DICT,
     CONF_COLORS,
     CONF_ENTITY_TYPE,
+    CONF_TRANSITION,
     DEFAULT_ANIMATE_BRIGHTNESS,
     DEFAULT_ANIMATE_COLOR,
     DEFAULT_CHANGE_SEQUENCE,
@@ -58,6 +60,18 @@ def test_normalize_scene_input_adds_defaults() -> None:
     assert result["priority"] == DEFAULT_PRIORITY
     assert result["restore"] is DEFAULT_RESTORE
     assert result["restore_power"] is DEFAULT_RESTORE_POWER
+
+
+def test_normalize_scene_input_accepts_fractional_timing_values() -> None:
+    """Accept decimal transition and frequency values from config flows."""
+    data = _base_input()
+    data[CONF_TRANSITION] = "[0.5, 1.0]"
+    data[CONF_CHANGE_FREQUENCY] = "0.5"
+
+    result = normalize_scene_input(data)
+
+    assert result[CONF_TRANSITION] == [0.5, 1]
+    assert result[CONF_CHANGE_FREQUENCY] == 0.5
 
 
 def test_normalize_scene_input_preserves_config_flow_metadata() -> None:
@@ -121,6 +135,18 @@ def test_validate_start_service_data_accepts_normalized_scene_data() -> None:
 
     assert result[CONF_NAME] == "Spooky"
     assert result[CONF_CHANGE_AMOUNT] == "all"
+
+
+@pytest.mark.parametrize(CONF_CHANGE_FREQUENCY, [-1, 61])
+def test_validate_start_service_data_rejects_out_of_range_frequency(
+    change_frequency: int,
+) -> None:
+    """Reject scalar frequency service values outside the documented range."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_CHANGE_FREQUENCY] = change_frequency
+
+    with pytest.raises(vol.Invalid):
+        validate_start_service_data(data)
 
 
 def test_validate_start_service_data_rejects_config_flow_metadata() -> None:

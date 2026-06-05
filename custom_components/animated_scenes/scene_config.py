@@ -232,6 +232,20 @@ def is_int(value: Any) -> tuple[bool, Any]:
     return False, value
 
 
+def is_number(value: Any) -> tuple[bool, Any]:
+    """Return whether value is numeric and its normalized value."""
+    is_int_check, is_int_value = is_int(value)
+    if is_int_check:
+        return True, is_int_value
+    if value is None or not isinstance(value, int | float | str):
+        return False, value
+    try:
+        parsed = float(value)
+    except TypeError, ValueError:
+        return False, value
+    return True, parsed
+
+
 def list_or_int_to_str(value: Any) -> Any:
     """Return a UI string representation for an int or two-item list."""
     if isinstance(value, list):
@@ -279,19 +293,6 @@ def is_int_or_list(
                 return True, normalized[0]
             return True, normalized
     return False, value
-
-
-def is_number(value: Any) -> tuple[bool, Any]:
-    """Return whether value is numeric and its normalized value."""
-    if value is None or not isinstance(value, int | float | str):
-        return False, value
-    try:
-        parsed = float(value)
-    except TypeError, ValueError:
-        return False, value
-    if parsed.is_integer():
-        return True, int(parsed)
-    return True, parsed
 
 
 def is_number_or_list(

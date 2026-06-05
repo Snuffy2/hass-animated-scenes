@@ -6,6 +6,7 @@ from types import MappingProxyType
 
 from homeassistant.config_entries import ConfigEntry, DiscoveryKey
 from homeassistant.core import HomeAssistant
+import pytest
 
 from custom_components.animated_scenes.animations import Animations
 from custom_components.animated_scenes.const import (
@@ -18,7 +19,6 @@ from custom_components.animated_scenes.const import (
 from custom_components.animated_scenes.diagnostics import async_get_config_entry_diagnostics
 from custom_components.animated_scenes.sensor import AnimatedScenesSensor
 from custom_components.animated_scenes.switch import AnimatedSceneSwitch
-import pytest
 
 DISCOVERY_KEYS: MappingProxyType[str, tuple[DiscoveryKey, ...]] = MappingProxyType({})
 
