@@ -93,6 +93,13 @@ def _store_scene_entry(entry: ConfigEntry) -> None:
     entry.runtime_data = dict(entry.data)
 
 
+def _runtime_manager(hass: HomeAssistant) -> Animations:
+    """Return a runtime manager registered as the active singleton."""
+    manager = Animations(hass)
+    Animations.instance = manager
+    return manager
+
+
 @pytest.mark.asyncio
 async def test_services_register_with_schema(hass: HomeAssistant) -> None:
     """Require each public service registration to enforce its shared schema.
@@ -154,8 +161,7 @@ async def test_release_light_removes_owner_when_no_successor(hass: HomeAssistant
     ``_light_animations`` entries because later animations use those maps to
     decide whether a light is already owned.
     """
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
     animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
     manager.animations[animation.name] = animation
@@ -182,8 +188,7 @@ async def test_release_light_hands_owner_to_next_priority(hass: HomeAssistant) -
     owner should update ``light_owner`` and retain the stored original state so
     the final owner can restore it later.
     """
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
     low = Animation(hass, _animation_config("Low", ["light.one"], priority=1))
     high = Animation(hass, _animation_config("High", ["light.one"], priority=10))
@@ -210,8 +215,7 @@ async def test_release_light_skip_ownership_keeps_remaining_owner(
     another animation still tracks that light, the manager must retain a
     coherent owner so the remaining animation can keep ticking safely.
     """
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
     removed = Animation(hass, _animation_config("Removed", ["light.one"], priority=10))
     remaining = Animation(hass, _animation_config("Remaining", ["light.one"], priority=1))
@@ -231,8 +235,7 @@ async def test_release_light_skip_ownership_keeps_remaining_owner(
 @pytest.mark.asyncio
 async def test_add_lights_to_animation_fires_update_event(hass: HomeAssistant) -> None:
     """Notify event-driven entities after adding lights to a running animation."""
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
     hass.states.async_set("light.two", "on", {"brightness": 100, "color_mode": "rgb"})
     animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
@@ -252,8 +255,7 @@ async def test_add_lights_to_animation_rejects_missing_switch(
     hass: HomeAssistant,
 ) -> None:
     """Raise a clean integration error for a missing switch selector."""
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
 
     with pytest.raises(IntegrationError, match="was not found"):
         await manager.add_lights_to_animation(
@@ -264,8 +266,7 @@ async def test_add_lights_to_animation_rejects_missing_switch(
 @pytest.mark.asyncio
 async def test_remove_lights_fires_update_event(hass: HomeAssistant) -> None:
     """Notify event-driven entities after removing lights from animations."""
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
     animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
     manager.animations[animation.name] = animation
@@ -286,8 +287,7 @@ async def test_remove_lights_fires_update_event(hass: HomeAssistant) -> None:
 @pytest.mark.asyncio
 async def test_start_clamps_oversized_change_amount(hass: HomeAssistant) -> None:
     """Normalize service change_amount before the animation loop can sample lights."""
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
 
     await manager.start(
@@ -372,8 +372,7 @@ async def test_unload_entry_stops_scene_animation(hass: HomeAssistant) -> None:
     Unload must stop that runtime task so it does not continue controlling
     lights after Home Assistant removes the config entry's platform entity.
     """
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     animation = AsyncMock()
     animation.name = "Spooky"
     manager.animations["Spooky"] = animation
@@ -424,8 +423,7 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
             self.stop_count += 1
             self.manager.release_animation(self)
 
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     animation = ReleasingAnimation(manager)
     manager.animations["Spooky"] = animation
     entry = _scene_entry()
@@ -457,8 +455,7 @@ async def test_start_service_still_works_after_last_entry_unload(
     hass: HomeAssistant,
 ) -> None:
     """Keep public services active after the final config entry unloads."""
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     animation = AsyncMock()
     animation.name = "Spooky"
     manager.animations["Spooky"] = animation
@@ -486,8 +483,7 @@ async def test_unload_entry_keeps_animation_when_platform_unload_fails(
     loaded. Runtime cleanup must therefore wait until ``async_unload_platforms``
     succeeds.
     """
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     animation = AsyncMock()
     animation.name = "Spooky"
     manager.animations["Spooky"] = animation
