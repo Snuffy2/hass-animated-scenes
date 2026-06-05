@@ -11,11 +11,11 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .animations import Animations
-from .const import DEFAULT_ACTIVITY_SENSOR_ICON
+from .const import DEFAULT_ACTIVITY_SENSOR_ICON, EVENT_NAME_CHANGE
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 ENTITY_ID_FORMAT = Platform.SENSOR + ".{}"
@@ -56,7 +56,45 @@ class AnimatedScenesSensor(SensorEntity):
         self._attr_name: str = "Activity"
         self._attr_icon: str = DEFAULT_ACTIVITY_SENSOR_ICON
         self.entity_id = ENTITY_ID_FORMAT.format("animated_scenes_activity_sensor")
-        self._scan_interval: int = 3
+
+    @property
+    def should_poll(self) -> bool:
+        """Disable polling because animation events push state updates.
+
+        Returns:
+            False so Home Assistant does not periodically poll this entity.
+
+        """
+
+        return False
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to animation lifecycle events.
+
+        Returns:
+            None. Home Assistant removes the listener automatically when this
+            entity is removed.
+
+        """
+
+        self.async_on_remove(
+            self.hass.bus.async_listen(EVENT_NAME_CHANGE, self._handle_animation_event)
+        )
+
+    @callback
+    def _handle_animation_event(self, _: Event) -> None:
+        """Write sensor state immediately after animation activity changes.
+
+        Args:
+            _: The animation lifecycle event. The sensor recalculates from the
+                manager, so it does not need event payload fields.
+
+        Returns:
+            None.
+
+        """
+
+        self.async_write_ha_state()
 
     @property
     def native_value(self) -> int:

@@ -69,7 +69,6 @@ from .const import (
     ERROR_COLORS_IS_BLANK,
     ERROR_COLORS_MALFORMED,
 )
-
 from .scene_config import (
     clean_color_rgb_dict,
     is_int_or_list,
@@ -316,12 +315,10 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
         a scene entry, depending on whether an activity sensor already
         exists.
         """
-        activity_sensor_exists = False
-        if DOMAIN in self.hass.data:
-            for entity in self.hass.data[DOMAIN].values():
-                if entity.get(CONF_ENTITY_TYPE, ENTITY_SCENE) == ENTITY_ACTIVITY_SENSOR:
-                    activity_sensor_exists = True
-                    break
+        activity_sensor_exists = any(
+            entry.data.get(CONF_ENTITY_TYPE, ENTITY_SCENE) == ENTITY_ACTIVITY_SENSOR
+            for entry in self.hass.config_entries.async_entries(DOMAIN)
+        )
         if activity_sensor_exists:
             return await self.async_step_scene(user_input=user_input)
         return self.async_show_menu(
@@ -503,7 +500,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class AnimatedScenesOptionsFlowHandler(OptionsFlow):
-    """Config flow options. Does not actually store these into Options but updates the Config instead."""
+    """Handle scene options while storing updates back into config entry data."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize."""
