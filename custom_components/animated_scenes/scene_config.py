@@ -87,7 +87,12 @@ SCENE_DEFAULTS: dict[str, Any] = {
 COLOR_GROUP_SCHEMA = {
     vol.Optional(CONF_BRIGHTNESS, default=DEFAULT_BRIGHTNESS): vol.Any(
         vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
-        vol.All([vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX)]),
+        vol.ExactSequence(
+            (
+                vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
+                vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
+            )
+        ),
     ),
     vol.Optional(CONF_COLOR_WEIGHT, default=DEFAULT_COLOR_WEIGHT): vol.Range(min=0, max=255),
     vol.Optional(CONF_COLOR_ONE_CHANGE_PER_TICK, default=DEFAULT_COLOR_ONE_CHANGE_PER_TICK): bool,
@@ -108,24 +113,31 @@ START_SERVICE_CONFIG = {
     ),
     vol.Optional(CONF_TRANSITION, default=DEFAULT_TRANSITION): vol.Any(
         VALID_TRANSITION,
-        vol.All([VALID_TRANSITION]),
+        vol.ExactSequence((VALID_TRANSITION, VALID_TRANSITION)),
     ),
     vol.Optional(CONF_CHANGE_FREQUENCY, default=DEFAULT_CHANGE_FREQUENCY): vol.Any(
         vol.All(vol.Coerce(float), vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX)),
-        vol.All(
-            [
+        vol.ExactSequence(
+            (
                 vol.All(
                     vol.Coerce(float),
                     vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX),
-                )
-            ]
+                ),
+                vol.All(
+                    vol.Coerce(float),
+                    vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX),
+                ),
+            )
         ),
     ),
     vol.Optional(CONF_CHANGE_AMOUNT, default=DEFAULT_CHANGE_AMOUNT): vol.Any(
         "all",
         vol.All(vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)),
-        vol.All(
-            [vol.All(vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX))]
+        vol.ExactSequence(
+            (
+                vol.All(vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)),
+                vol.All(vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)),
+            )
         ),
     ),
     vol.Optional(CONF_CHANGE_SEQUENCE, default=DEFAULT_CHANGE_SEQUENCE): bool,

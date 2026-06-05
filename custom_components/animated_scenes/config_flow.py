@@ -16,6 +16,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.util import uuid
 import voluptuous as vol
 
+from .animations import Animations
 from .const import (
     ABORT_ACTIVITY_SENSOR_NO_OPTIONS,
     ABORT_INTEGRATION_NO_OPTIONS,
@@ -508,6 +509,19 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         self._rgb_ui_color_max = len(self._rgb_ui_color_keys)
         self._rgb_ui_color_index = 0
 
+    async def _async_stop_previous_animation_if_renamed(self) -> None:
+        """Stop an active scene using its stored name before saving a rename."""
+        previous_name = self.config.data.get(CONF_NAME)
+        new_name = self._data.get(CONF_NAME)
+        manager = Animations.instance
+        if (
+            manager
+            and previous_name
+            and previous_name != new_name
+            and previous_name in manager.animations
+        ):
+            await manager.stop_by_name(previous_name)
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the options."""
         if self._data.get(CONF_ENTITY_TYPE, ENTITY_SCENE) == ENTITY_ACTIVITY_SENSOR:
@@ -585,6 +599,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
             # _LOGGER.debug(f"[async_step_color_yaml] self._data: {self._data}")
             if not errors:
                 self._data.update({CONF_COLOR_RGB_DICT: {}})
+                await self._async_stop_previous_animation_if_renamed()
                 self.hass.config_entries.async_update_entry(
                     self.config, data=self._data, options=self.config.options
                 )
@@ -666,6 +681,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                     }
                 )
                 # _LOGGER.debug(f"[async_step_color_rgb_ui] self._data: {self._data}")
+                await self._async_stop_previous_animation_if_renamed()
                 self.hass.config_entries.async_update_entry(
                     self.config, data=self._data, options=self.config.options
                 )

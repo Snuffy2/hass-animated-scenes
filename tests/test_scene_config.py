@@ -137,9 +137,9 @@ def test_validate_start_service_data_accepts_normalized_scene_data() -> None:
     assert result[CONF_CHANGE_AMOUNT] == "all"
 
 
-@pytest.mark.parametrize(CONF_CHANGE_FREQUENCY, [-1, 61])
+@pytest.mark.parametrize(CONF_CHANGE_FREQUENCY, [-1, "-1", 61, "61"])
 def test_validate_start_service_data_rejects_out_of_range_frequency(
-    change_frequency: int,
+    change_frequency: object,
 ) -> None:
     """Reject scalar frequency service values outside the documented range."""
     data = normalize_scene_input(_base_input())
@@ -176,11 +176,38 @@ def test_validate_start_service_data_rejects_empty_colors() -> None:
         validate_start_service_data(data)
 
 
-@pytest.mark.parametrize("value", [-1, "-1", 61, "61"])
-def test_validate_start_service_data_rejects_out_of_range_frequency(value: object) -> None:
-    """Reject public service frequencies outside the runtime sleep bounds."""
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("transition", []),
+        ("transition", [1, 2, 3]),
+        ("change_frequency", []),
+        ("change_frequency", [1, 2, 3]),
+        (CONF_CHANGE_AMOUNT, []),
+        (CONF_CHANGE_AMOUNT, [1, 2, 3]),
+    ],
+)
+def test_validate_start_service_data_rejects_malformed_ranges(
+    field: str,
+    value: list[int],
+) -> None:
+    """Reject empty and overlong range lists before runtime randomization."""
     data = normalize_scene_input(_base_input())
-    data["change_frequency"] = value
+    data[field] = value
+
+    with pytest.raises(vol.Invalid):
+        validate_start_service_data(data)
+
+
+@pytest.mark.parametrize("brightness", [[], [1, 2, 3]])
+def test_validate_start_service_data_rejects_malformed_color_brightness_ranges(
+    brightness: list[int],
+) -> None:
+    """Reject malformed per-color brightness ranges before light updates."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_COLORS] = [
+        {"color_type": "rgb_color", "color": [255, 0, 0], CONF_BRIGHTNESS: brightness}
+    ]
 
     with pytest.raises(vol.Invalid):
         validate_start_service_data(data)
