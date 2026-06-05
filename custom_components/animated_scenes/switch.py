@@ -153,6 +153,7 @@ class AnimatedSceneSwitch(SwitchEntity):
         Returns:
             A deep-copied service configuration with entity-only metadata and
             UI-only color selector fields removed.
+
         """
 
         if self._config.get(CONF_COLOR_SELECTOR_MODE, None) == COLOR_SELECTOR_RGB_UI:
@@ -198,9 +199,26 @@ class AnimatedSceneSwitch(SwitchEntity):
         Returns:
             True when the switch has observed a start event or was turned on
             locally; false after a stop event or local turn-off.
+
         """
 
         return self._attr_is_on
+
+    @property
+    def device_info(self) -> dict[str, object]:
+        """Return integration device metadata for this switch.
+
+        Returns:
+            A device registry payload grouping Animated Scenes entities under
+            one integration device.
+
+        """
+
+        return {
+            "identifiers": {(DOMAIN, "animated_scenes")},
+            "name": INTEGRATION_NAME,
+            "manufacturer": INTEGRATION_NAME,
+        }
 
     async def async_added_to_hass(self) -> None:
         """Subscribe the switch to animation lifecycle events.
@@ -208,6 +226,7 @@ class AnimatedSceneSwitch(SwitchEntity):
         Returns:
             None. The listener removal callback is registered with Home
             Assistant so it is cleaned up automatically when the entity unloads.
+
         """
 
         self.async_on_remove(
@@ -224,6 +243,7 @@ class AnimatedSceneSwitch(SwitchEntity):
 
         Returns:
             None. Unrelated animation events are ignored.
+
         """
 
         if event.data.get("animation") != self._attr_name:

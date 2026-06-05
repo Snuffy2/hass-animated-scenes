@@ -1,5 +1,11 @@
 {
     "title": "Animated Scenes",
+    "issues": {
+        "deprecated_yaml": {
+            "title": "Animated Scenes YAML configuration is deprecated",
+            "description": "The {integration_title} YAML configuration for {domain} is deprecated. Import the entry through the integration UI and manage it from Settings > Devices & Services."
+        }
+    },
     "config": {
         "step": {
             "user": {
