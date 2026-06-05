@@ -394,7 +394,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._data.update(user_input)
-            if self._data.get(CONF_COLORS) is None or self._data.get(CONF_COLORS) == {}:
+            if self._data.get(CONF_COLORS) in (None, {}, []):
                 errors["base"] = ERROR_COLORS_IS_BLANK
             if not isinstance(self._data.get(CONF_COLORS), list):
                 errors["base"] = ERROR_COLORS_MALFORMED
@@ -590,7 +590,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
 
         if user_input is not None:
             self._data.update(user_input)
-            if self._data.get(CONF_COLORS) is None or self._data.get(CONF_COLORS) == {}:
+            if self._data.get(CONF_COLORS) in (None, {}, []):
                 errors["base"] = ERROR_COLORS_IS_BLANK
             if not isinstance(self._data.get(CONF_COLORS), list):
                 errors["base"] = ERROR_COLORS_MALFORMED

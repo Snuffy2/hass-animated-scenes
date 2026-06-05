@@ -137,11 +137,21 @@ def test_validate_start_service_data_accepts_normalized_scene_data() -> None:
     assert result[CONF_CHANGE_AMOUNT] == "all"
 
 
-@pytest.mark.parametrize(CONF_CHANGE_FREQUENCY, [-1, "-1", 61, "61"])
+@pytest.mark.parametrize(
+    CONF_CHANGE_FREQUENCY,
+    [
+        -1,
+        "-1",
+        61,
+        "61",
+        pytest.param([0, 1], id="zero_int_range"),
+        pytest.param([0.0, 0.5], id="zero_float_range"),
+    ],
+)
 def test_validate_start_service_data_rejects_out_of_range_frequency(
     change_frequency: object,
 ) -> None:
-    """Reject scalar frequency service values outside the documented range."""
+    """Reject frequency service values outside the safe runtime range."""
     data = normalize_scene_input(_base_input())
     data[CONF_CHANGE_FREQUENCY] = change_frequency
 
@@ -168,7 +178,7 @@ def test_validate_start_service_data_rejects_malformed_colors() -> None:
 
 
 def test_validate_start_service_data_rejects_empty_colors() -> None:
-    """Reject runtime configs that cannot pick an initial color."""
+    """Reject empty colors lists before runtime color selection."""
     data = normalize_scene_input(_base_input())
     data[CONF_COLORS] = []
 
@@ -185,6 +195,8 @@ def test_validate_start_service_data_rejects_empty_colors() -> None:
         ("change_frequency", [1, 2, 3]),
         (CONF_CHANGE_AMOUNT, []),
         (CONF_CHANGE_AMOUNT, [1, 2, 3]),
+        (CONF_BRIGHTNESS, []),
+        (CONF_BRIGHTNESS, [1, 2, 3]),
     ],
 )
 def test_validate_start_service_data_rejects_malformed_ranges(

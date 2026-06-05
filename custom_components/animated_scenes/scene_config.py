@@ -109,7 +109,12 @@ START_SERVICE_CONFIG = {
     vol.Optional(CONF_RESTORE_POWER, default=DEFAULT_RESTORE_POWER): bool,
     vol.Optional(CONF_BRIGHTNESS, default=DEFAULT_BRIGHTNESS): vol.Any(
         vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
-        vol.All([vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX)]),
+        vol.ExactSequence(
+            (
+                vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
+                vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
+            )
+        ),
     ),
     vol.Optional(CONF_TRANSITION, default=DEFAULT_TRANSITION): vol.Any(
         VALID_TRANSITION,
@@ -121,11 +126,11 @@ START_SERVICE_CONFIG = {
             (
                 vol.All(
                     vol.Coerce(float),
-                    vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX),
+                    vol.Range(min=1e-9, max=CHANGE_FREQUENCY_MAX),
                 ),
                 vol.All(
                     vol.Coerce(float),
-                    vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX),
+                    vol.Range(min=1e-9, max=CHANGE_FREQUENCY_MAX),
                 ),
             )
         ),
@@ -393,6 +398,8 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
         normalized.get(CONF_CHANGE_FREQUENCY), CHANGE_FREQUENCY_MIN, CHANGE_FREQUENCY_MAX
     )
     if not frequency_ok:
+        raise vol.Invalid(ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE)
+    if isinstance(frequency_value, list) and min(frequency_value) <= 0:
         raise vol.Invalid(ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE)
     normalized[CONF_CHANGE_FREQUENCY] = frequency_value
 
