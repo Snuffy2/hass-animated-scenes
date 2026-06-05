@@ -153,11 +153,11 @@ class AnimatedSceneSwitch(SwitchEntity):
             UI-only color selector fields removed.
 
         """
-        if self._config.get(CONF_COLOR_SELECTOR_MODE, None) == COLOR_SELECTOR_RGB_UI:
-            self._config[CONF_COLORS] = build_colors_from_rgb_dict(
-                self._config.get(CONF_COLOR_RGB_DICT, {})
-            )
         animation_config = copy.deepcopy(self._config)
+        if animation_config.get(CONF_COLOR_SELECTOR_MODE, None) == COLOR_SELECTOR_RGB_UI:
+            animation_config[CONF_COLORS] = build_colors_from_rgb_dict(
+                animation_config.get(CONF_COLOR_RGB_DICT, {})
+            )
         animation_config.pop(CONF_PLATFORM, None)
         animation_config.pop(CONF_ICON, None)
         animation_config.pop(CONF_ENTITY_TYPE, None)

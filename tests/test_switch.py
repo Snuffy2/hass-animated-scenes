@@ -13,6 +13,7 @@ from custom_components.animated_scenes.const import (
     COLOR_SELECTOR_RGB_UI,
     CONF_COLOR_RGB_DICT,
     CONF_COLOR_SELECTOR_MODE,
+    CONF_COLORS,
     DOMAIN,
     EVENT_NAME_CHANGE,
     EVENT_STATE_STARTED,
@@ -70,6 +71,27 @@ async def test_switch_animation_config_ready_in_constructor(hass: HomeAssistant)
     switch = AnimatedSceneSwitch(hass, _switch_config(), "entry-id")
 
     assert switch._animation_config["colors"] == [
+        {
+            "color": [255, 0, 0],
+            "brightness": 255,
+            "weight": 10,
+            "color_type": "rgb_color",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_switch_animation_config_does_not_mutate_source_config(
+    hass: HomeAssistant,
+) -> None:
+    """Keep RGB UI conversion isolated to the runtime animation copy."""
+    config = _switch_config()
+    config.pop(CONF_COLORS)
+
+    switch = AnimatedSceneSwitch(hass, config, "entry-id")
+
+    assert CONF_COLORS not in config
+    assert switch._animation_config[CONF_COLORS] == [
         {
             "color": [255, 0, 0],
             "brightness": 255,
