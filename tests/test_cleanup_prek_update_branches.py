@@ -8,6 +8,8 @@ import sys
 from types import ModuleType
 from typing import Any
 
+import pytest
+
 SCRIPT_PATH = Path(__file__).parents[1] / ".github" / "scripts" / "cleanup_prek_update_branches.py"
 
 
@@ -95,9 +97,9 @@ def test_next_link_returns_next_pagination_url() -> None:
     assert cleanup._next_link(None) is None
 
 
-def test_is_workflow_pull_requires_all_ownership_markers() -> None:
-    """Require label, author, body marker, branch prefix, and repository match."""
-    kwargs = {
+def _workflow_pull_kwargs() -> dict[str, str]:
+    """Return the ownership markers for workflow-created update pull requests."""
+    return {
         "repository": "owner/repo",
         "branch": "chore/prek-updates",
         "branch_prefix": "chore/prek-updates",
@@ -106,12 +108,27 @@ def test_is_workflow_pull_requires_all_ownership_markers() -> None:
         "body_marker": "Automated update of `prek` hooks.",
     }
 
-    assert cleanup._is_workflow_pull(_pull(1), **kwargs) is True
-    assert cleanup._is_workflow_pull(_pull(1, label="manual"), **kwargs) is False
-    assert cleanup._is_workflow_pull(_pull(1, author="alice"), **kwargs) is False
-    assert cleanup._is_workflow_pull(_pull(1, body="manual update"), **kwargs) is False
-    assert cleanup._is_workflow_pull(_pull(1, head_ref="feature/manual"), **kwargs) is False
-    assert cleanup._is_workflow_pull(_pull(1, repository="fork/repo"), **kwargs) is False
+
+def test_is_workflow_pull_accepts_matching_ownership_markers() -> None:
+    """Accept a pull request with every workflow ownership marker."""
+    assert cleanup._is_workflow_pull(_pull(1), **_workflow_pull_kwargs()) is True
+
+
+@pytest.mark.parametrize(
+    "pull",
+    [
+        pytest.param(_pull(1, label="manual"), id="label"),
+        pytest.param(_pull(1, author="alice"), id="author"),
+        pytest.param(_pull(1, body="manual update"), id="body"),
+        pytest.param(_pull(1, head_ref="feature/manual"), id="branch"),
+        pytest.param(_pull(1, repository="fork/repo"), id="repository"),
+    ],
+)
+def test_is_workflow_pull_rejects_missing_ownership_marker(
+    pull: dict[str, object],
+) -> None:
+    """Reject pull requests missing any workflow ownership marker."""
+    assert cleanup._is_workflow_pull(pull, **_workflow_pull_kwargs()) is False
 
 
 def test_cleanup_update_branches_keeps_current_pr_and_deletes_stale_refs() -> None:
