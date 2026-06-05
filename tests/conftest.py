@@ -11,14 +11,27 @@ pytest_plugins = ("pytest_homeassistant_custom_component",)
 
 
 @pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations: None) -> Iterator[None]:
+def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Enable custom integrations for every test.
 
-    Yields:
-        None. The fixture restores the animation singleton after each test.
+    Args:
+        enable_custom_integrations: Home Assistant helper fixture.
+
+    Returns:
+        None.
 
     """
-    _ = enable_custom_integrations
+    assert enable_custom_integrations is None
+
+
+@pytest.fixture(autouse=True)
+def restore_animations_instance() -> Iterator[None]:
+    """Restore the global animation singleton after each test.
+
+    Yields:
+        None.
+
+    """
     previous_instance = Animations.instance
     try:
         yield
