@@ -102,5 +102,6 @@ async def test_options_rename_stops_previous_animation_before_reload(
 
     stop_by_name.assert_awaited_once_with("Spooky")
     reload_entry.assert_awaited_once_with("spooky")
+    assert entry.title == "Scary"
     assert entry.data[CONF_NAME] == "Scary"
     assert result["type"] == "create_entry"

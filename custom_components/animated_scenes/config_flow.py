@@ -601,7 +601,10 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                 self._data.update({CONF_COLOR_RGB_DICT: {}})
                 await self._async_stop_previous_animation_if_renamed()
                 self.hass.config_entries.async_update_entry(
-                    self.config, data=self._data, options=self.config.options
+                    self.config,
+                    data=self._data,
+                    options=self.config.options,
+                    title=self._data[CONF_NAME],
                 )
                 await self.hass.config_entries.async_reload(self.config.entry_id)
                 return self.async_create_entry(title="", data={})
@@ -683,7 +686,10 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                 # _LOGGER.debug(f"[async_step_color_rgb_ui] self._data: {self._data}")
                 await self._async_stop_previous_animation_if_renamed()
                 self.hass.config_entries.async_update_entry(
-                    self.config, data=self._data, options=self.config.options
+                    self.config,
+                    data=self._data,
+                    options=self.config.options,
+                    title=self._data[CONF_NAME],
                 )
                 await self.hass.config_entries.async_reload(self.config.entry_id)
                 return self.async_create_entry(title="", data={})
