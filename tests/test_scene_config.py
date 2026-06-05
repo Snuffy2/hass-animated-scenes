@@ -226,19 +226,17 @@ def test_validate_start_service_data_rejects_config_flow_metadata() -> None:
         validate_start_service_data(data)
 
 
-def test_validate_start_service_data_rejects_malformed_colors() -> None:
-    """Reject malformed service color payloads before animation startup."""
+@pytest.mark.parametrize(
+    "colors",
+    [
+        pytest.param([{"color_type": "rgb_color", "color": [255, 0]}], id="malformed"),
+        pytest.param([], id="empty"),
+    ],
+)
+def test_validate_start_service_data_rejects_invalid_colors(colors: list[object]) -> None:
+    """Reject invalid color lists before animation startup."""
     data = normalize_scene_input(_base_input())
-    data[CONF_COLORS] = [{"color_type": "rgb_color", "color": [255, 0]}]
-
-    with pytest.raises(vol.Invalid):
-        validate_start_service_data(data)
-
-
-def test_validate_start_service_data_rejects_empty_colors() -> None:
-    """Reject empty colors lists before runtime color selection."""
-    data = normalize_scene_input(_base_input())
-    data[CONF_COLORS] = []
+    data[CONF_COLORS] = colors
 
     with pytest.raises(vol.Invalid):
         validate_start_service_data(data)
