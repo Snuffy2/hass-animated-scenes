@@ -52,6 +52,13 @@ def _switch_config() -> dict[str, object]:
     }
 
 
+def _runtime_manager(hass: HomeAssistant) -> Animations:
+    """Return a runtime manager registered as the active singleton."""
+    manager = Animations(hass)
+    Animations.instance = manager
+    return manager
+
+
 @pytest.mark.asyncio
 async def test_switch_animation_config_ready_in_constructor(hass: HomeAssistant) -> None:
     """Build runtime animation data before the switch can be turned on.
@@ -123,8 +130,7 @@ async def test_switch_tracks_animation_events(hass: HomeAssistant) -> None:
 @pytest.mark.asyncio
 async def test_switch_turn_on_stays_off_for_one_shot_scene(hass: HomeAssistant) -> None:
     """Keep one-shot scenes off after the manager releases them during startup."""
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     config = _switch_config()
     config["change_frequency"] = 0
     switch = AnimatedSceneSwitch(hass, config, "entry-id")
@@ -140,8 +146,7 @@ async def test_switch_rejects_empty_rgb_ui_colors_before_animation_loop(
     hass: HomeAssistant,
 ) -> None:
     """Reject empty RGB UI color storage before random color selection runs."""
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     config = _switch_config()
     config[CONF_COLOR_RGB_DICT] = {}
     switch = AnimatedSceneSwitch(hass, config, "entry-id")
@@ -158,8 +163,7 @@ async def test_switch_stays_off_when_one_shot_animation_releases(
     hass: HomeAssistant,
 ) -> None:
     """Keep the switch off when start completes without a running animation."""
-    manager = Animations(hass)
-    Animations.instance = manager
+    manager = _runtime_manager(hass)
     switch = AnimatedSceneSwitch(hass, _switch_config(), "entry-id")
     switch.hass = hass
 
