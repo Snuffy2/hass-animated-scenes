@@ -6,6 +6,7 @@ from homeassistant.const import CONF_BRIGHTNESS, CONF_LIGHTS, CONF_NAME
 import pytest
 import voluptuous as vol
 
+from custom_components.animated_scenes import scene_config
 from custom_components.animated_scenes.const import (
     CONF_CHANGE_AMOUNT,
     CONF_CHANGE_FREQUENCY,
@@ -25,6 +26,7 @@ from custom_components.animated_scenes.const import (
 )
 from custom_components.animated_scenes.scene_config import (
     build_colors_from_rgb_dict,
+    clean_color_rgb_dict,
     normalize_scene_input,
     validate_start_service_data,
 )
@@ -299,3 +301,67 @@ def test_build_colors_from_rgb_dict_converts_to_color_list() -> None:
             "color_type": CONF_COLOR_RGB,
         },
     ]
+
+
+def test_clean_color_rgb_dict_copies_only_retained_color_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Clean RGB UI data without deep-copying the whole color mapping."""
+    color_rgb_dict = {
+        "keep": {"color": [1, 2, 3], "color_delete_color": False},
+        "delete": {"color": [4, 5, 6], "color_delete_color": True},
+    }
+    copied_objects: list[object] = []
+    original_deepcopy = scene_config.copy.deepcopy
+
+    def track_deepcopy(value: object) -> object:
+        """Track copied objects while preserving deepcopy behavior."""
+        copied_objects.append(value)
+        return original_deepcopy(value)
+
+    monkeypatch.setattr(scene_config.copy, "deepcopy", track_deepcopy)
+
+    result = clean_color_rgb_dict(color_rgb_dict)
+
+    assert result == {"keep": {"color": [1, 2, 3]}}
+    assert color_rgb_dict == {
+        "keep": {"color": [1, 2, 3], "color_delete_color": False},
+        "delete": {"color": [4, 5, 6], "color_delete_color": True},
+    }
+    assert color_rgb_dict not in copied_objects
+
+
+def test_build_colors_from_rgb_dict_copies_only_color_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Build runtime colors without deep-copying the whole color mapping."""
+    color_rgb_dict = {
+        "one": {"color": [1, 2, 3], "brightness": 200, "weight": 10},
+        "two": {"color": [4, 5, 6], "brightness": [100, 255], "weight": 5},
+    }
+    copied_objects: list[object] = []
+    original_deepcopy = scene_config.copy.deepcopy
+
+    def track_deepcopy(value: object) -> object:
+        """Track copied objects while preserving deepcopy behavior."""
+        copied_objects.append(value)
+        return original_deepcopy(value)
+
+    monkeypatch.setattr(scene_config.copy, "deepcopy", track_deepcopy)
+
+    result = build_colors_from_rgb_dict(color_rgb_dict)
+
+    assert result == [
+        {"color": [1, 2, 3], "brightness": 200, "weight": 10, "color_type": CONF_COLOR_RGB},
+        {
+            "color": [4, 5, 6],
+            "brightness": [100, 255],
+            "weight": 5,
+            "color_type": CONF_COLOR_RGB,
+        },
+    ]
+    assert color_rgb_dict == {
+        "one": {"color": [1, 2, 3], "brightness": 200, "weight": 10},
+        "two": {"color": [4, 5, 6], "brightness": [100, 255], "weight": 5},
+    }
+    assert color_rgb_dict not in copied_objects

@@ -132,22 +132,62 @@ CHANGE_FREQUENCY_VALUE_SCHEMA = vol.All(
 CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA = vol.All(
     vol.Coerce(float), vol.Range(min=1e-9, max=CHANGE_FREQUENCY_MAX)
 )
-
-COLOR_GROUP_SCHEMA = {
-    vol.Optional(CONF_BRIGHTNESS, default=DEFAULT_BRIGHTNESS): vol.Any(
-        BRIGHTNESS_VALUE_SCHEMA,
+CHANGE_AMOUNT_VALUE_SCHEMA = vol.All(
+    vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)
+)
+BRIGHTNESS_RANGE_SCHEMA = vol.Any(
+    BRIGHTNESS_VALUE_SCHEMA,
+    vol.ExactSequence(
+        (
+            BRIGHTNESS_VALUE_SCHEMA,
+            BRIGHTNESS_VALUE_SCHEMA,
+        )
+    ),
+    vol.All(
+        vol.Match(INT_RANGE_PATTERN),
+        _strlist_to_list,
+        vol.ExactSequence((BRIGHTNESS_VALUE_SCHEMA, BRIGHTNESS_VALUE_SCHEMA)),
+    ),
+)
+TRANSITION_RANGE_SCHEMA = vol.Any(
+    TRANSITION_VALUE_SCHEMA,
+    vol.ExactSequence((TRANSITION_VALUE_SCHEMA, TRANSITION_VALUE_SCHEMA)),
+    vol.All(
+        vol.Match(NUMBER_RANGE_PATTERN),
+        _strlist_to_list,
+        vol.ExactSequence((TRANSITION_VALUE_SCHEMA, TRANSITION_VALUE_SCHEMA)),
+    ),
+)
+CHANGE_FREQUENCY_RANGE_SCHEMA = vol.Any(
+    CHANGE_FREQUENCY_VALUE_SCHEMA,
+    vol.ExactSequence(
+        (
+            CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA,
+            CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA,
+        )
+    ),
+    vol.All(
+        vol.Match(NUMBER_RANGE_PATTERN),
+        _strlist_to_list,
         vol.ExactSequence(
-            (
-                BRIGHTNESS_VALUE_SCHEMA,
-                BRIGHTNESS_VALUE_SCHEMA,
-            )
-        ),
-        vol.All(
-            vol.Match(INT_RANGE_PATTERN),
-            _strlist_to_list,
-            vol.ExactSequence((BRIGHTNESS_VALUE_SCHEMA, BRIGHTNESS_VALUE_SCHEMA)),
+            (CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA, CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA)
         ),
     ),
+)
+CHANGE_AMOUNT_RANGE_SCHEMA = vol.Any(
+    "all",
+    CHANGE_AMOUNT_VALUE_SCHEMA,
+    vol.Match(INT_RANGE_PATTERN),
+    vol.ExactSequence(
+        (
+            CHANGE_AMOUNT_VALUE_SCHEMA,
+            CHANGE_AMOUNT_VALUE_SCHEMA,
+        )
+    ),
+)
+
+COLOR_GROUP_SCHEMA = {
+    vol.Optional(CONF_BRIGHTNESS, default=DEFAULT_BRIGHTNESS): BRIGHTNESS_RANGE_SCHEMA,
     vol.Optional(CONF_COLOR_WEIGHT, default=DEFAULT_COLOR_WEIGHT): vol.Range(min=0, max=255),
     vol.Optional(CONF_COLOR_ONE_CHANGE_PER_TICK, default=DEFAULT_COLOR_ONE_CHANGE_PER_TICK): bool,
     vol.Optional(
@@ -161,56 +201,12 @@ START_SERVICE_CONFIG = {
     vol.Optional(CONF_IGNORE_OFF, default=DEFAULT_IGNORE_OFF): bool,
     vol.Optional(CONF_RESTORE, default=DEFAULT_RESTORE): bool,
     vol.Optional(CONF_RESTORE_POWER, default=DEFAULT_RESTORE_POWER): bool,
-    vol.Optional(CONF_BRIGHTNESS, default=DEFAULT_BRIGHTNESS): vol.Any(
-        BRIGHTNESS_VALUE_SCHEMA,
-        vol.ExactSequence(
-            (
-                BRIGHTNESS_VALUE_SCHEMA,
-                BRIGHTNESS_VALUE_SCHEMA,
-            )
-        ),
-        vol.All(
-            vol.Match(INT_RANGE_PATTERN),
-            _strlist_to_list,
-            vol.ExactSequence((BRIGHTNESS_VALUE_SCHEMA, BRIGHTNESS_VALUE_SCHEMA)),
-        ),
+    vol.Optional(CONF_BRIGHTNESS, default=DEFAULT_BRIGHTNESS): BRIGHTNESS_RANGE_SCHEMA,
+    vol.Optional(CONF_TRANSITION, default=DEFAULT_TRANSITION): TRANSITION_RANGE_SCHEMA,
+    vol.Optional(CONF_CHANGE_FREQUENCY, default=DEFAULT_CHANGE_FREQUENCY): (
+        CHANGE_FREQUENCY_RANGE_SCHEMA
     ),
-    vol.Optional(CONF_TRANSITION, default=DEFAULT_TRANSITION): vol.Any(
-        TRANSITION_VALUE_SCHEMA,
-        vol.ExactSequence((TRANSITION_VALUE_SCHEMA, TRANSITION_VALUE_SCHEMA)),
-        vol.All(
-            vol.Match(NUMBER_RANGE_PATTERN),
-            _strlist_to_list,
-            vol.ExactSequence((TRANSITION_VALUE_SCHEMA, TRANSITION_VALUE_SCHEMA)),
-        ),
-    ),
-    vol.Optional(CONF_CHANGE_FREQUENCY, default=DEFAULT_CHANGE_FREQUENCY): vol.Any(
-        CHANGE_FREQUENCY_VALUE_SCHEMA,
-        vol.ExactSequence(
-            (
-                CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA,
-                CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA,
-            )
-        ),
-        vol.All(
-            vol.Match(NUMBER_RANGE_PATTERN),
-            _strlist_to_list,
-            vol.ExactSequence(
-                (CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA, CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA)
-            ),
-        ),
-    ),
-    vol.Optional(CONF_CHANGE_AMOUNT, default=DEFAULT_CHANGE_AMOUNT): vol.Any(
-        "all",
-        vol.All(vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)),
-        vol.Match(INT_RANGE_PATTERN),
-        vol.ExactSequence(
-            (
-                vol.All(vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)),
-                vol.All(vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)),
-            )
-        ),
-    ),
+    vol.Optional(CONF_CHANGE_AMOUNT, default=DEFAULT_CHANGE_AMOUNT): CHANGE_AMOUNT_RANGE_SCHEMA,
     vol.Optional(CONF_CHANGE_SEQUENCE, default=DEFAULT_CHANGE_SEQUENCE): bool,
     vol.Optional(CONF_ANIMATE_BRIGHTNESS, default=DEFAULT_ANIMATE_BRIGHTNESS): bool,
     vol.Optional(CONF_ANIMATE_COLOR, default=DEFAULT_ANIMATE_COLOR): bool,
@@ -482,19 +478,20 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
 
 def clean_color_rgb_dict(color_rgb_dict: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """Remove RGB UI-only helper keys from stored color data."""
-    cleaned = copy.deepcopy(color_rgb_dict)
-    for key, color in list(cleaned.items()):
-        cleaned[key].pop(CONF_COLOR_ADD_COLOR, None)
+    cleaned = {}
+    for key, color in color_rgb_dict.items():
         if color.get(CONF_COLOR_DELETE_COLOR, False):
-            cleaned.pop(key, None)
-        else:
-            cleaned[key].pop(CONF_COLOR_DELETE_COLOR, None)
+            continue
+        cleaned_color = copy.deepcopy(color)
+        cleaned_color.pop(CONF_COLOR_ADD_COLOR, None)
+        cleaned_color.pop(CONF_COLOR_DELETE_COLOR, None)
+        cleaned[key] = cleaned_color
     return cleaned
 
 
 def build_colors_from_rgb_dict(color_rgb_dict: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     """Convert RGB UI storage into the runtime colors list."""
-    color_list = list(copy.deepcopy(color_rgb_dict).values())
+    color_list = [copy.deepcopy(color) for color in color_rgb_dict.values()]
     for color in color_list:
         color[CONF_COLOR_TYPE] = CONF_COLOR_RGB
     return color_list
