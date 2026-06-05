@@ -2,13 +2,8 @@
 
 from __future__ import annotations
 
-from custom_components.animated_scenes.const import CONF_CHANGE_AMOUNT
+from custom_components.animated_scenes.const import CONF_CHANGE_AMOUNT, CONF_LIGHTS
 from custom_components.animated_scenes.scene_config import normalize_scene_input
-
-try:
-    from custom_components.animated_scenes.const import CONF_LIGHTS
-except ImportError:  # pragma: no cover - compatibility with current branch state.
-    CONF_LIGHTS = "lights"
 
 
 def test_normalize_scene_input_clamps_change_amount_to_all() -> None:
