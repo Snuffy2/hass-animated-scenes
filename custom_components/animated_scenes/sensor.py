@@ -5,7 +5,6 @@ animations and exposes attributes that list active animations and active
 lights owned by the integration.
 """
 
-import logging
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
@@ -18,7 +17,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .animations import Animations
 from .const import DEFAULT_ACTIVITY_SENSOR_ICON, DOMAIN, EVENT_NAME_CHANGE, INTEGRATION_NAME
 
-_LOGGER: logging.Logger = logging.getLogger(__name__)
 ENTITY_ID_FORMAT = Platform.SENSOR + ".{}"
 
 
@@ -50,36 +48,17 @@ class AnimatedScenesSensor(SensorEntity):
         self.hass: HomeAssistant = hass
         self._attr_native_unit_of_measurement: str = "active animation(s)"
         self._attr_state_class: SensorStateClass = SensorStateClass.MEASUREMENT
+        self._attr_should_poll: bool = False
         self._attr_has_entity_name: bool = True
         self._attr_unique_id: str = "animated_scenes_activity_sensor"
         self._attr_name: str = "Activity"
         self._attr_icon: str = DEFAULT_ACTIVITY_SENSOR_ICON
-        self.entity_id = ENTITY_ID_FORMAT.format("animated_scenes_activity_sensor")
-
-    @property
-    def should_poll(self) -> bool:
-        """Disable polling because animation events push state updates.
-
-        Returns:
-            False so Home Assistant does not periodically poll this entity.
-
-        """
-        return False
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return integration device metadata for the activity sensor.
-
-        Returns:
-            A device registry payload grouping Animated Scenes entities under
-            one integration device.
-
-        """
-        return {
+        self._attr_device_info: DeviceInfo = {
             "identifiers": {(DOMAIN, "animated_scenes")},
             "name": INTEGRATION_NAME,
             "manufacturer": INTEGRATION_NAME,
         }
+        self.entity_id = ENTITY_ID_FORMAT.format("animated_scenes_activity_sensor")
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to animation lifecycle events.
@@ -110,8 +89,9 @@ class AnimatedScenesSensor(SensorEntity):
     @property
     def native_value(self) -> int:
         """Return the number of active animations."""
-        if Animations.instance:
-            return len(Animations.instance.animations)
+        manager = Animations.instance
+        if manager:
+            return len(manager.animations)
         return 0
 
     @property
@@ -121,9 +101,10 @@ class AnimatedScenesSensor(SensorEntity):
         Returns a mapping containing the list of active animations and the
         list of lights currently owned by animations.
         """
-        if Animations.instance:
+        manager = Animations.instance
+        if manager:
             return {
-                "active": list(Animations.instance.animations.keys()),
-                "active_lights": list(Animations.instance.light_owner.keys()),
+                "active": list(manager.animations.keys()),
+                "active_lights": list(manager.light_owner.keys()),
             }
         return {}
