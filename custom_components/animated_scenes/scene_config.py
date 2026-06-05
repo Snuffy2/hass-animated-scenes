@@ -83,13 +83,43 @@ SCENE_DEFAULTS: dict[str, Any] = {
     CONF_PRIORITY: DEFAULT_PRIORITY,
 }
 
+NUMBER_RANGE_PATTERN = r"^\[\s*(?:\d+(?:\.\d+)?|\.\d+)\s*,\s*(?:\d+(?:\.\d+)?|\.\d+)\s*\]$"
+INT_RANGE_PATTERN = r"^\[\s*\d+\s*,\s*\d+\s*\]$"
+
+
+def _strlist_to_list(value: str) -> list[str]:
+    """Convert a bracketed comma-separated string into a trimmed item list.
+
+    Args:
+        value: A bracketed comma-separated string such as ``"[1, 2]"``.
+
+    Returns:
+        The trimmed list items between brackets. Malformed empty items are
+        preserved for the caller's typed validation to reject.
+    """
+    return [item.strip() for item in value.strip("][").split(",")]
+
+
+def _float_to_int(value: float) -> int:
+    """Convert a whole float to int or raise for fractional values."""
+    if not value.is_integer():
+        raise vol.Invalid("brightness must be an int")
+    return int(value)
+
+
 BRIGHTNESS_VALUE_SCHEMA = vol.All(
     vol.Coerce(float),
+    _float_to_int,
     vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
-    lambda value: int(value) if value.is_integer() else vol.Invalid("brightness must be an int"),
 )
 TRANSITION_VALUE_SCHEMA = vol.All(
     vol.Coerce(float), vol.Range(min=TRANSITION_MIN, max=TRANSITION_MAX)
+)
+CHANGE_FREQUENCY_VALUE_SCHEMA = vol.All(
+    vol.Coerce(float), vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX)
+)
+CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA = vol.All(
+    vol.Coerce(float), vol.Range(min=1e-9, max=CHANGE_FREQUENCY_MAX)
 )
 
 COLOR_GROUP_SCHEMA = {
@@ -100,6 +130,11 @@ COLOR_GROUP_SCHEMA = {
                 BRIGHTNESS_VALUE_SCHEMA,
                 BRIGHTNESS_VALUE_SCHEMA,
             )
+        ),
+        vol.All(
+            vol.Match(INT_RANGE_PATTERN),
+            _strlist_to_list,
+            vol.ExactSequence((BRIGHTNESS_VALUE_SCHEMA, BRIGHTNESS_VALUE_SCHEMA)),
         ),
     ),
     vol.Optional(CONF_COLOR_WEIGHT, default=DEFAULT_COLOR_WEIGHT): vol.Range(min=0, max=255),
@@ -123,30 +158,41 @@ START_SERVICE_CONFIG = {
                 BRIGHTNESS_VALUE_SCHEMA,
             )
         ),
+        vol.All(
+            vol.Match(INT_RANGE_PATTERN),
+            _strlist_to_list,
+            vol.ExactSequence((BRIGHTNESS_VALUE_SCHEMA, BRIGHTNESS_VALUE_SCHEMA)),
+        ),
     ),
     vol.Optional(CONF_TRANSITION, default=DEFAULT_TRANSITION): vol.Any(
         TRANSITION_VALUE_SCHEMA,
         vol.ExactSequence((TRANSITION_VALUE_SCHEMA, TRANSITION_VALUE_SCHEMA)),
+        vol.All(
+            vol.Match(NUMBER_RANGE_PATTERN),
+            _strlist_to_list,
+            vol.ExactSequence((TRANSITION_VALUE_SCHEMA, TRANSITION_VALUE_SCHEMA)),
+        ),
     ),
     vol.Optional(CONF_CHANGE_FREQUENCY, default=DEFAULT_CHANGE_FREQUENCY): vol.Any(
-        vol.All(vol.Coerce(float), vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX)),
+        CHANGE_FREQUENCY_VALUE_SCHEMA,
         vol.ExactSequence(
             (
-                vol.All(
-                    vol.Coerce(float),
-                    vol.Range(min=1e-9, max=CHANGE_FREQUENCY_MAX),
-                ),
-                vol.All(
-                    vol.Coerce(float),
-                    vol.Range(min=1e-9, max=CHANGE_FREQUENCY_MAX),
-                ),
+                CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA,
+                CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA,
             )
+        ),
+        vol.All(
+            vol.Match(NUMBER_RANGE_PATTERN),
+            _strlist_to_list,
+            vol.ExactSequence(
+                (CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA, CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA)
+            ),
         ),
     ),
     vol.Optional(CONF_CHANGE_AMOUNT, default=DEFAULT_CHANGE_AMOUNT): vol.Any(
         "all",
         vol.All(vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)),
-        vol.Match(r"^\[\s*\d+\s*,\s*\d+\s*\]$"),
+        vol.Match(INT_RANGE_PATTERN),
         vol.ExactSequence(
             (
                 vol.All(vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)),
@@ -280,19 +326,6 @@ def list_or_int_to_str(value: Any) -> Any:
     if is_int_check:
         return str(is_int_value)
     return value
-
-
-def _strlist_to_list(value: str) -> list[str]:
-    """Convert a bracketed comma-separated string into a trimmed item list.
-
-    Args:
-        value: A bracketed comma-separated string such as ``"[1, 2]"``.
-
-    Returns:
-        The trimmed list items between brackets. Malformed empty items are
-        preserved for the caller's typed validation to reject.
-    """
-    return [item.strip() for item in value.strip("][").split(",")]
 
 
 def is_int_or_list(

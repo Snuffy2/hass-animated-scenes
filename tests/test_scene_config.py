@@ -163,6 +163,35 @@ def test_validate_start_service_data_accepts_templated_numeric_strings() -> None
     assert result[CONF_CHANGE_FREQUENCY] == 0.5
 
 
+def test_validate_start_service_data_accepts_templated_numeric_ranges() -> None:
+    """Accept bracketed numeric range strings from automation service data."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_BRIGHTNESS] = "[70, 255]"
+    data[CONF_TRANSITION] = "[0.5, 1.0]"
+    data[CONF_CHANGE_FREQUENCY] = "[0.25, 1.5]"
+
+    result = validate_start_service_data(data)
+
+    assert result[CONF_BRIGHTNESS] == [70, 255]
+    assert result[CONF_TRANSITION] == [0.5, 1.0]
+    assert result[CONF_CHANGE_FREQUENCY] == [0.25, 1.5]
+
+
+@pytest.mark.parametrize(
+    CONF_BRIGHTNESS,
+    [(0.5,), ("0.5",), ([1, 2.5],), ("[1, 2.5]",)],
+)
+def test_validate_start_service_data_rejects_fractional_brightness(
+    brightness: object,
+) -> None:
+    """Reject fractional brightness values before runtime light calls."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_BRIGHTNESS] = brightness
+
+    with pytest.raises(vol.Invalid):
+        validate_start_service_data(data)
+
+
 @pytest.mark.parametrize(
     CONF_CHANGE_FREQUENCY,
     [
