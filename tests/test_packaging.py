@@ -51,7 +51,8 @@ def test_release_workflow_updates_static_package_version() -> None:
     workflow = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
 
     assert "Update Version in pyproject.toml" in workflow
-    assert 'version = "${{ github.event.release.tag_name }}"' in workflow
+    assert "RELEASE_TAG: ${{ github.event.release.tag_name }}" in workflow
+    assert "${RELEASE_TAG}" in workflow
 
 
 def test_post_coverage_workflow_skips_prs_without_comment_artifacts() -> None:

@@ -38,18 +38,24 @@ jobs:
 
       - name: Update Version in Manifest
         if: ${{ github.event_name == 'release' && github.event.release.draft == false }}
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          sed -i 's/\"version\"\s*\:\s*\".*\"/\"version\"\:\"${{ github.event.release.tag_name }}\"/g' ./custom_components/animated_scenes/manifest.json
+          sed -i "s|\"version\"\s*\:\s*\".*\"|\"version\"\:\"${RELEASE_TAG}\"|g" ./custom_components/animated_scenes/manifest.json
 
       - name: Update Version in const.py
         if: ${{ github.event_name == 'release' && github.event.release.draft == false }}
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          sed -i 's/^VERSION \= \".*\"/VERSION \= \"${{ github.event.release.tag_name }}\"/' ./custom_components/animated_scenes/const.py
+          sed -i "s|^VERSION \= \".*\"|VERSION \= \"${RELEASE_TAG}\"|" ./custom_components/animated_scenes/const.py
 
       - name: Update Version in pyproject.toml
         if: ${{ github.event_name == 'release' && github.event.release.draft == false }}
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          sed -i 's/^version = ".*"/version = "${{ github.event.release.tag_name }}"/' ./pyproject.toml
+          sed -i "s|^version = \".*\"|version = \"${RELEASE_TAG}\"|" ./pyproject.toml
 
       - name: Commit & Push Version Changes
         if: ${{ github.event_name == 'release' && github.event.release.draft == false && github.event.release.prerelease == false  }}

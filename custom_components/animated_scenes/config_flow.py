@@ -85,7 +85,15 @@ COLOR_SELECTOR_OPTION_LIST = [
 
 
 def _validate_yaml_runtime_data(data: dict[str, Any]) -> None:
-    """Validate YAML color data using runtime fields only."""
+    """Validate YAML color data using runtime fields only.
+
+    Args:
+        data: Scene configuration that may include config-flow-only fields.
+
+    Raises:
+        vol.Invalid: If the runtime service schema rejects the color data.
+
+    """
     runtime_data = dict(data)
     runtime_data.pop(CONF_COLOR_RGB_DICT, None)
     runtime_data.pop(CONF_COLOR_SELECTOR_MODE, None)

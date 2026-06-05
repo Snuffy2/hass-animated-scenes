@@ -101,7 +101,18 @@ def _strlist_to_list(value: str) -> list[str]:
 
 
 def _float_to_int(value: float) -> int:
-    """Convert a whole float to int or raise for fractional values."""
+    """Convert a whole float to int or raise for fractional values.
+
+    Args:
+        value: Float value to convert to an integer.
+
+    Returns:
+        Integer representation of the float.
+
+    Raises:
+        vol.Invalid: If the float has a fractional component.
+
+    """
     if not value.is_integer():
         raise vol.Invalid("brightness must be an int")
     return int(value)
