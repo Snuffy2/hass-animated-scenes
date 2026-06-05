@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 from homeassistant.const import CONF_LIGHTS, CONF_NAME
 from homeassistant.core import HomeAssistant
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.animated_scenes.animations import Animation, Animations
@@ -140,29 +141,26 @@ async def test_options_rename_stops_previous_animation_before_reload(
     assert result["type"] == "create_entry"
 
 
-async def test_options_yaml_rejects_empty_color_list(hass: HomeAssistant) -> None:
-    """Reject an empty YAML color list before saving options."""
-    flow, _ = _options_flow(hass)
-
-    result = await flow.async_step_color_yaml({CONF_COLORS: []})
-
-    assert result["type"] == "form"
-    errors = result["errors"]
-    assert errors is not None
-    assert errors["base"] == ERROR_COLORS_IS_BLANK
-
-
-async def test_options_yaml_rejects_malformed_color_payload(
-    hass: HomeAssistant,
+@pytest.mark.parametrize(
+    ("colors", "expected_error"),
+    [
+        pytest.param([], ERROR_COLORS_IS_BLANK, id="empty"),
+        pytest.param(
+            [{"color_type": "rgb_color", "color": [255, 0]}],
+            ERROR_COLORS_MALFORMED,
+            id="malformed",
+        ),
+    ],
+)
+async def test_options_yaml_rejects_invalid_colors(
+    hass: HomeAssistant, colors: list[object], expected_error: str
 ) -> None:
-    """Reject malformed YAML colors before saving options."""
+    """Reject invalid YAML colors before saving options."""
     flow, _ = _options_flow(hass)
 
-    result = await flow.async_step_color_yaml(
-        {CONF_COLORS: [{"color_type": "rgb_color", "color": [255, 0]}]}
-    )
+    result = await flow.async_step_color_yaml({CONF_COLORS: colors})
 
     assert result["type"] == "form"
     errors = result["errors"]
     assert errors is not None
-    assert errors["base"] == ERROR_COLORS_MALFORMED
+    assert errors["base"] == expected_error
