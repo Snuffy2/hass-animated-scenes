@@ -65,7 +65,6 @@ from .const import (
     CONF_COLOR_NEARBY_COLORS,
     CONF_COLOR_ONE_CHANGE_PER_TICK,
     CONF_COLOR_TYPE,
-    CONF_COLOR_WEIGHT,
     CONF_COLORS,
     CONF_IGNORE_OFF,
     CONF_PRIORITY,
@@ -963,23 +962,37 @@ class Animations:
         This handles handing ownership to another animation, restoring
         the previous state, and cleaning up stored state.
         """
-        self._light_animations[entity_id].remove(animation)
-        if self.light_owner[entity_id] != animation:
+        animations_for_light = self._light_animations.get(entity_id, [])
+        if animation in animations_for_light:
+            animations_for_light.remove(animation)
+
+        current_owner = self.light_owner.get(entity_id)
+        if current_owner is not None and current_owner != animation:
             return _LOGGER.info(
                 "Not releasing light %s as it is owned by another animation %s",
                 entity_id,
-                self.light_owner[entity_id].name,
+                current_owner.name,
             )
-        if len(self._light_animations[entity_id]) > 0 and not skip_ownership:
+        if animations_for_light and not skip_ownership:
             light_owner = self.refresh_animation_for_light(entity_id)
             if light_owner:
                 self.light_owner[entity_id] = light_owner
                 return _LOGGER.info(
                     "Changing owner from %s to %s",
                     animation.name,
-                    self.light_owner[entity_id].name,
+                    light_owner.name,
                 )
-        if animation.restore and not skip_restore:
+        if animations_for_light:
+            light_owner = self.refresh_animation_for_light(entity_id)
+            if light_owner:
+                self.light_owner[entity_id] = light_owner
+                return _LOGGER.info(
+                    "Keeping owner %s for light %s after releasing %s",
+                    light_owner.name,
+                    entity_id,
+                    animation.name,
+                )
+        if animation.restore and not skip_restore and entity_id in self.states:
             previous_state = self.states[entity_id]
             if previous_state.state == "on":
                 await safe_call(
@@ -990,7 +1003,11 @@ class Animations:
                 )
             elif animation.restore_power:
                 await safe_call(self.hass, LIGHT_DOMAIN, SERVICE_TURN_OFF, {"entity_id": entity_id})
-        del self.states[entity_id]
+        self.states.pop(entity_id, None)
+        self.light_owner.pop(entity_id, None)
+        if not animations_for_light:
+            self._light_animations.pop(entity_id, None)
+        self.refresh_listener()
         return None
 
     async def add_lights_to_animation(self, data: dict[str, Any]) -> None:
