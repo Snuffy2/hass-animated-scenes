@@ -132,9 +132,7 @@ async def _async_build_schema(
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_CHANGE_AMOUNT,
-                default=list_or_int_to_str(
-                    _get_default(CONF_CHANGE_AMOUNT, DEFAULT_CHANGE_AMOUNT)
-                ),
+                default=list_or_int_to_str(_get_default(CONF_CHANGE_AMOUNT, DEFAULT_CHANGE_AMOUNT)),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Optional(
                 CONF_BRIGHTNESS,

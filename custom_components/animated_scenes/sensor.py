@@ -12,6 +12,7 @@ from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .animations import Animations
@@ -66,7 +67,7 @@ class AnimatedScenesSensor(SensorEntity):
         return False
 
     @property
-    def device_info(self) -> dict[str, object]:
+    def device_info(self) -> DeviceInfo:
         """Return integration device metadata for the activity sensor.
 
         Returns:

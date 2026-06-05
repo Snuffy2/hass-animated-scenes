@@ -10,14 +10,14 @@ pytest_plugins = ("pytest_homeassistant_custom_component",)
 
 
 @pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations: None) -> Generator[None, None, None]:
+def auto_enable_custom_integrations(enable_custom_integrations: None) -> Generator[None]:
     """Enable custom integrations for every test.
 
     Yields:
         None: Control returns to pytest after custom integrations are enabled.
 
     """
-    yield
+    return
 
 
 @pytest.fixture

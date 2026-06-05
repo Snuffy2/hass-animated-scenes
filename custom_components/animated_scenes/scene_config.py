@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-from numbers import Number
 from typing import Any
 
 import voluptuous as vol
@@ -115,9 +114,7 @@ START_SERVICE_CONFIG = {
     vol.Optional(CONF_CHANGE_FREQUENCY, default=DEFAULT_CHANGE_FREQUENCY): vol.Any(
         vol.Coerce(float),
         vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX),
-        vol.All(
-            [vol.Coerce(float), vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX)]
-        ),
+        vol.All([vol.Coerce(float), vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX)]),
     ),
     vol.Optional(CONF_CHANGE_AMOUNT, default=DEFAULT_CHANGE_AMOUNT): vol.Any(
         "all",
@@ -218,7 +215,7 @@ REMOVE_LIGHTS_SERVICE_SCHEMA = vol.Schema(
 
 def is_int(value: Any) -> tuple[bool, Any]:
     """Return whether value is integer-like and its normalized value."""
-    if value is None or not isinstance(value, Number | str):
+    if value is None or not isinstance(value, int | float | str):
         return False, value
     try:
         parsed = float(value)

@@ -561,12 +561,12 @@ class Animation:
             ATTR_XY_COLOR,
         }:
             # Unsupported color types: return the configured color as-is
-            return raw if raw else []
+            return raw or []
 
         base_rgb = self._convert_to_rgb(color=color)
 
         if base_rgb is None:
-            return raw if raw else []
+            return raw or []
 
         # colorsys expects RGB values in the 0..1 range. Our stored
         # colors are bytes (0..255), so normalize first.

@@ -99,6 +99,7 @@ Expected final branch upstream: `origin/review/functionality-optimization-audit`
 ### Task 1: Modernize Project Tooling and Agent Instructions
 
 **Files:**
+
 - Create: `AGENTS.md`
 - Modify: `pyproject.toml`
 - Create: `prek.toml`
@@ -330,6 +331,7 @@ git commit -m "chore: modernize animated scenes project tooling"
 ### Task 2: Establish Test Harness
 
 **Files:**
+
 - Create: `tests/conftest.py`
 - Create: `tests/test_scene_config.py`
 
@@ -413,6 +415,7 @@ git commit -m "test: add animated scenes test harness"
 ### Task 3: Shared Scene Config Normalization
 
 **Files:**
+
 - Create: `custom_components/animated_scenes/scene_config.py`
 - Modify: `custom_components/animated_scenes/config_flow.py`
 - Modify: `custom_components/animated_scenes/animations.py`
@@ -977,6 +980,7 @@ git commit -m "refactor: share animated scene config normalization"
 ### Task 4: Register Service Schemas and Align Service UI Contract
 
 **Files:**
+
 - Modify: `custom_components/animated_scenes/__init__.py`
 - Modify: `custom_components/animated_scenes/services.yaml`
 - Test: `tests/test_animations.py`
@@ -1123,6 +1127,7 @@ git commit -m "fix: validate animated scenes service calls at registration"
 ### Task 5: Fix Animation Manager Ownership Cleanup
 
 **Files:**
+
 - Modify: `custom_components/animated_scenes/animations.py`
 - Test: `tests/test_animations.py`
 
@@ -1277,6 +1282,7 @@ git commit -m "fix: clear stale animated scene light ownership"
 ### Task 6: Align Config Entry Reload/Unload with Runtime Cleanup
 
 **Files:**
+
 - Modify: `custom_components/animated_scenes/animations.py`
 - Modify: `custom_components/animated_scenes/__init__.py`
 - Test: `tests/test_animations.py`
@@ -1413,6 +1419,7 @@ git commit -m "fix: stop animations during config entry unload"
 ### Task 7: Make Switch Entity Ready and Event-Driven
 
 **Files:**
+
 - Modify: `custom_components/animated_scenes/switch.py`
 - Modify: `custom_components/animated_scenes/animations.py`
 - Test: `tests/test_switch.py`
@@ -1618,6 +1625,7 @@ git commit -m "fix: make animated scene switches event driven"
 ### Task 8: Make Activity Sensor Unique and Event-Driven
 
 **Files:**
+
 - Modify: `custom_components/animated_scenes/config_flow.py`
 - Modify: `custom_components/animated_scenes/sensor.py`
 - Test: `tests/test_sensor.py`
@@ -1765,6 +1773,7 @@ git commit -m "fix: make animated scenes activity sensor event driven"
 ### Task 9: Add Diagnostics and HA Support Metadata
 
 **Files:**
+
 - Create: `custom_components/animated_scenes/diagnostics.py`
 - Modify: `custom_components/animated_scenes/switch.py`
 - Modify: `custom_components/animated_scenes/sensor.py`
@@ -1932,6 +1941,7 @@ git commit -m "feat: add animated scenes diagnostics and support metadata"
 ### Task 10: Docstring Modernization
 
 **Files:**
+
 - Modify: `custom_components/animated_scenes/__init__.py`
 - Modify: `custom_components/animated_scenes/animations.py`
 - Modify: `custom_components/animated_scenes/config_flow.py`
@@ -2092,6 +2102,7 @@ git commit -m "docs: improve animated scenes python docstrings"
 ### Task 11: Documentation and Final Verification
 
 **Files:**
+
 - Modify: `README.MD`
 - Modify: `MEMORY.md`
 

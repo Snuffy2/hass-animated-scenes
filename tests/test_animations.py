@@ -114,7 +114,9 @@ async def test_release_light_removes_owner_when_no_successor(hass: HomeAssistant
     manager._light_animations["light.one"] = [animation]  # noqa: SLF001
     manager.store_state("light.one")
 
-    with patch.object(manager, "refresh_listener", wraps=manager.refresh_listener) as refresh_listener:
+    with patch.object(
+        manager, "refresh_listener", wraps=manager.refresh_listener
+    ) as refresh_listener:
         await manager.release_light(animation, "light.one")
 
     assert "light.one" not in manager.light_owner

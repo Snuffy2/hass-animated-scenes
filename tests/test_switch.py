@@ -32,9 +32,7 @@ def _switch_config() -> dict[str, object]:
         "lights": ["light.one"],
         "colors": {},
         CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_RGB_UI,
-        CONF_COLOR_RGB_DICT: {
-            "one": {"color": [255, 0, 0], "brightness": 255, "weight": 10}
-        },
+        CONF_COLOR_RGB_DICT: {"one": {"color": [255, 0, 0], "brightness": 255, "weight": 10}},
         "ignore_off": True,
         "restore": True,
         "restore_power": False,

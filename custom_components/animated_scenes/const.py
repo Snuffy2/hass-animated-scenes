@@ -1,7 +1,5 @@
 """Constants for the Animated Scenes integration."""
 
-from homeassistant.const import CONF_LIGHTS as CONF_LIGHTS
-
 INTEGRATION_NAME = "Animated Scenes"
 DOMAIN = "animated_scenes"
 VERSION = "2.1.1"
@@ -16,6 +14,7 @@ CONF_ANIMATE_COLOR = "animate_color"
 CONF_CHANGE_AMOUNT = "change_amount"
 CONF_CHANGE_FREQUENCY = "change_frequency"
 CONF_CHANGE_SEQUENCE = "change_sequence"
+CONF_LIGHTS = "lights"
 CONF_COLORS = "colors"
 CONF_COLOR = "color"
 CONF_COLOR_TYPE = "color_type"

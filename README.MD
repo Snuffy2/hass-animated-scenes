@@ -73,6 +73,19 @@ Now you can set up an automation so that when the toggle is flipped, the animati
 
 For configuring colors, you can choose from the following options, see [Color Configuration](#color-configuration)
 
+### Service Limits
+
+The integration validates service calls before runtime:
+
+- `transition`: 0 to 6553 seconds
+- `change_frequency`: 0 to 60 seconds. Use 0 to apply the initial update once and release the lights.
+- `change_amount`: an integer, a two-item range like `[1, 3]`, or `all`
+- `brightness`: 0 to 255, or a two-item range like `[70, 255]`
+
+Values configured through the UI and values passed to services use the same validation rules.
+
+When a scene config entry is reloaded or unloaded, any matching running animation is stopped and its light ownership is released before the entity is removed.
+
 ### Color Configuration
 
 ```yaml
@@ -179,12 +192,10 @@ I did this initially to create an animation that mimics the Haunted House animat
 
 You can add an activity sensor by going to Settings -> Devices & services -> Animated Scenes -> Add Device and choosing 'Create the Activity Sensor.'
 
-The Activity sensor is set to the number of currently running animations. The attributes are:
+The Activity sensor updates when animations start or stop. The attributes are:
 
 - active: A list of currently running animations.
 - active_lights: A list of lights currently in use by animations.
-
-Note that the sensor does not update immediately, so there may be a few seconds from when an animation is stopped til it is reflected on the sensor.
 
 Here is a simple example script which would stop all currently running animations.
 
@@ -246,6 +257,15 @@ data:
     - light.living_room_1
   name: Animation ID
 ```
+
+## Development
+
+- Use Python 3.14.
+- Install local development dependencies from `pyproject.toml` with `./.venv/bin/python -m pip install -e ".[dev,lint,test]"`.
+- Use `prek` for hooks; hook configuration lives in `prek.toml`.
+- This repository intentionally does not use `requirements*.txt` files or `.pre-commit-config.yaml`.
+- Future agent instructions live in `AGENTS.md`.
+- Python files must include meaningful file, class, and method docstrings. Method docstrings, including private and nested methods, use Google Style and explain intent, invariants, side effects, arguments, raised exceptions, and return semantics where relevant.
 
 [commits-shield]: https://img.shields.io/github/last-commit/chazzu/hass-animated-scenes?style=for-the-badge
 [commits]: https://github.com/chazzu/hass-animated-scenes/commits/main
