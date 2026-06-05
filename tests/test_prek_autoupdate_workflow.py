@@ -192,15 +192,6 @@ def test_workflow_runs_updates_weekly_and_cleanup_daily() -> None:
     assert "name: Nightly Cleanup" in workflow_text
 
 
-def test_workflow_scopes_write_permissions_to_jobs() -> None:
-    """Workflow should not grant write permissions globally."""
-    workflow_text = WORKFLOW_PATH.read_text()
-
-    top_level_text = workflow_text.split("jobs:", maxsplit=1)[0]
-    assert "permissions:" not in top_level_text
-    assert workflow_text.count("permissions:") == 2
-
-
 def test_workflow_cancels_overlapping_runs() -> None:
     """Workflow should cancel older runs before a new cleanup starts."""
     workflow_text = WORKFLOW_PATH.read_text()

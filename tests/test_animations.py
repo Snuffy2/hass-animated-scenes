@@ -105,6 +105,17 @@ def _runtime_manager(hass: HomeAssistant) -> Animations:
     return manager
 
 
+def _tracked_animation(hass: HomeAssistant, manager: Animations) -> Animation:
+    """Return a running animation registered in manager ownership maps."""
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+    animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
+    manager.animations[animation.name] = animation
+    manager.light_owner["light.one"] = animation
+    manager._light_animations["light.one"] = [animation]
+    manager.store_state("light.one")
+    return animation
+
+
 def test_rgb_to_kelvin_caches_repeated_lookup() -> None:
     """Avoid repeating the expensive kelvin search for the same RGB value."""
     _rgb_to_kelvin.cache_clear()
@@ -386,7 +397,7 @@ def test_validate_start_converts_normalization_errors_to_integration_error(
     hass: HomeAssistant, invalid_data: dict[str, object]
 ) -> None:
     """Report malformed service data with IntegrationError instead of raw exceptions."""
-    manager = Animations(hass)
+    manager = _runtime_manager(hass)
     data = _animation_config("Spooky", ["light.one"])
     data.update(invalid_data)
 
@@ -395,30 +406,32 @@ def test_validate_start_converts_normalization_errors_to_integration_error(
 
 
 @pytest.mark.asyncio
-async def test_manager_stop_by_name_stops_running_animation(hass: HomeAssistant) -> None:
-    """Stop a named animation without requiring service-call validation.
+async def test_manager_stop_by_name_releases_running_animation(hass: HomeAssistant) -> None:
+    """Release a named animation without requiring service-call validation.
 
     Config-entry unload already has a trusted entry title/name, so it should be
-    able to stop the matching runtime animation directly instead of fabricating
-    service data for the public ``stop_animation`` handler.
+    able to release the matching runtime animation directly instead of
+    fabricating service data for the public ``stop_animation`` handler.
     """
-    manager = Animations(hass)
-    animation = AsyncMock()
-    animation.name = "Spooky"
-    manager.animations["Spooky"] = animation
+    manager = _runtime_manager(hass)
+    _tracked_animation(hass, manager)
 
-    await manager.stop_by_name("Spooky")
+    with patch("custom_components.animated_scenes.animations.safe_call", AsyncMock()):
+        await manager.stop_by_name("Spooky")
 
-    animation.stop.assert_awaited_once()
+    assert manager.animations == {}
+    assert manager.states == {}
+    assert manager.light_owner == {}
+    assert manager._light_animations == {}
 
 
 @pytest.mark.asyncio
 async def test_unload_entry_stops_scene_animation(hass: HomeAssistant) -> None:
-    """Stop a running scene animation before unloading its config entry.
+    """Release a running scene animation before unloading its config entry.
 
     A scene entity can be removed or reloaded while its animation is active.
-    Unload must stop that runtime task so it does not continue controlling
-    lights after Home Assistant removes the config entry's platform entity.
+    Unload must release runtime state so it does not continue controlling lights
+    after Home Assistant removes the config entry's platform entity.
     """
     manager = _runtime_manager(hass)
     animation = AsyncMock()
@@ -430,7 +443,7 @@ async def test_unload_entry_stops_scene_animation(hass: HomeAssistant) -> None:
     with patch.object(hass.config_entries, "async_unload_platforms", return_value=True):
         assert await async_unload_entry(hass, entry) is True
 
-    animation.stop.assert_awaited_once()
+    animation.release.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -460,8 +473,8 @@ async def test_unload_entry_handles_animation_release_cleanup(hass: HomeAssistan
             """Return the animation name used by the runtime manager."""
             return "Spooky"
 
-        async def stop(self) -> None:
-            """Record one stop call and release from the manager.
+        async def release(self) -> None:
+            """Record one release call and release from the manager.
 
             Returns:
                 None. The method mirrors the real animation path that calls
@@ -516,7 +529,7 @@ async def test_start_service_still_works_after_last_entry_unload(
     with patch.object(manager, "start", AsyncMock()) as manager_start:
         await start_animation(ServiceCall(hass, DOMAIN, "start_animation", {CONF_NAME: "Manual"}))
 
-    animation.stop.assert_awaited_once()
+    animation.release.assert_awaited_once()
     manager_start.assert_awaited_once_with({CONF_NAME: "Manual"})
     assert Animations.instance is manager
 

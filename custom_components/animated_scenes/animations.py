@@ -941,7 +941,7 @@ class Animations:
             await self.animations[id_name].stop()
 
     async def stop_by_name(self, name: str) -> None:
-        """Stop a running animation by its runtime name.
+        """Release a running animation by its runtime name.
 
         Args:
             name: Animation name stored in ``self.animations``.
@@ -953,7 +953,7 @@ class Animations:
         """
         animation = self.animations.get(name)
         if animation is not None:
-            await animation.stop()
+            await animation.release()
             self.animations.pop(name, None)
 
     async def stop_all(self) -> None:

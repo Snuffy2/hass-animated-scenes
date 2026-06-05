@@ -8,13 +8,14 @@ concurrency:
   group: prek-autoupdate-${{ github.repository }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   update-hooks:
     name: Update prek Hooks
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - name: Check weekly update window
         id: weekly
@@ -124,9 +125,6 @@ jobs:
     needs: update-hooks
     if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
