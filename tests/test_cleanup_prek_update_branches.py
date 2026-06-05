@@ -156,3 +156,25 @@ def test_cleanup_update_branches_keeps_current_pr_and_deletes_stale_refs() -> No
         {"state": "open", "max_pages": None},
         {"state": "closed", "max_pages": cleanup.CLOSED_PULL_PAGE_LIMIT},
     ]
+
+
+def test_cleanup_update_branches_deletes_current_stale_branch_when_unprotected() -> None:
+    """Delete the current workflow branch when no kept PR protects it."""
+    client = FakeGithubClient(open_pulls=[])
+
+    result = cleanup.cleanup_update_branches(
+        client=client,
+        repository="owner/repo",
+        branch="chore/prek-updates",
+        branch_prefix="chore/prek-updates",
+        label_name="dependencies",
+        author_login="github-actions[bot]",
+        body_marker="Automated update of `prek` hooks.",
+        keep_pr_number=None,
+        close_stale_prs=False,
+        delete_stale_branch=True,
+        delete_merged_branches=False,
+    )
+
+    assert result.deleted_branches == ["chore/prek-updates"]
+    assert client.deleted_refs == ["heads/chore/prek-updates"]
