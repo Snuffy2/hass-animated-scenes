@@ -29,12 +29,17 @@ def _const_version() -> str:
     raise AssertionError("VERSION constant not found")
 
 
-def test_static_project_version_matches_integration_constant() -> None:
-    """Keep package metadata version static and synchronized without importing HA."""
+def test_project_version_is_dynamic_from_integration_constant() -> None:
+    """Keep package metadata version derived from const.py without importing HA."""
     pyproject = tomllib.loads(PYPROJECT_PATH.read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == _const_version()
-    assert "dynamic" not in pyproject["project"]
+    assert pyproject["project"]["dynamic"] == ["version"]
+    assert "version" not in pyproject["project"]
+    assert (
+        pyproject["tool"]["setuptools"]["dynamic"]["version"]["attr"]
+        == "custom_components.animated_scenes.const.VERSION"
+    )
+    assert _const_version()
 
 
 def test_package_data_includes_runtime_yaml_and_brand_assets() -> None:
@@ -46,13 +51,12 @@ def test_package_data_includes_runtime_yaml_and_brand_assets() -> None:
     assert "brand/*.png" in package_data["custom_components.animated_scenes"]
 
 
-def test_release_workflow_updates_static_package_version() -> None:
-    """Keep release automation synchronized with static package metadata."""
+def test_release_workflow_does_not_update_dynamic_package_version() -> None:
+    """Keep release automation focused on files that own version data."""
     workflow = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
 
-    assert "Update Version in pyproject.toml" in workflow
-    assert "RELEASE_TAG: ${{ github.event.release.tag_name }}" in workflow
-    assert "${RELEASE_TAG}" in workflow
+    assert "Update Version in pyproject.toml" not in workflow
+    assert "./pyproject.toml" not in workflow
 
 
 def test_post_coverage_workflow_skips_prs_without_comment_artifacts() -> None:

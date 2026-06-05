@@ -1,6 +1,6 @@
 [project]
 name = "hass-animated-scenes"
-version = "2.1.1"
+dynamic = ["version"]
 description = "Animated light scenes custom integration for Home Assistant"
 readme = "README.MD"
 requires-python = ">=3.14"
@@ -19,6 +19,9 @@ namespaces = true
 
 [tool.setuptools.package-data]
 "custom_components.animated_scenes" = ["*.json", "*.yaml", "brand/*.png", "translations/*.json"]
+
+[tool.setuptools.dynamic]
+version = { attr = "custom_components.animated_scenes.const.VERSION" }
 
 [dependency-groups]
 ha = [

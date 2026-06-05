@@ -50,13 +50,6 @@ jobs:
         run: |
           sed -i "s|^VERSION \= \".*\"|VERSION \= \"${RELEASE_TAG}\"|" ./custom_components/animated_scenes/const.py
 
-      - name: Update Version in pyproject.toml
-        if: ${{ github.event_name == 'release' && github.event.release.draft == false }}
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          sed -i "s|^version = \".*\"|version = \"${RELEASE_TAG}\"|" ./pyproject.toml
-
       - name: Commit & Push Version Changes
         if: ${{ github.event_name == 'release' && github.event.release.draft == false && github.event.release.prerelease == false  }}
         uses: stefanzweifel/git-auto-commit-action@v7
