@@ -71,6 +71,7 @@ from .const import (
     ERROR_COLORS_MALFORMED,
 )
 from .scene_config import (
+    SCENE_DEFAULTS,
     clean_color_rgb_dict,
     is_int_or_list,
     list_or_int_to_str,
@@ -83,6 +84,14 @@ COLOR_SELECTOR_OPTION_LIST = [
     selector.SelectOptionDict(label="Use RGB Selectors", value=COLOR_SELECTOR_RGB_UI),
     selector.SelectOptionDict(label="Configure via YAML", value=COLOR_SELECTOR_YAML),
 ]
+RGB_UI_COLOR_DEFAULTS = {
+    CONF_BRIGHTNESS: DEFAULT_BRIGHTNESS,
+    CONF_COLOR_NEARBY_COLORS: DEFAULT_COLOR_NEARBY_COLORS,
+    CONF_COLOR_ONE_CHANGE_PER_TICK: DEFAULT_COLOR_ONE_CHANGE_PER_TICK,
+    CONF_COLOR_WEIGHT: DEFAULT_COLOR_WEIGHT,
+    CONF_COLOR_ADD_COLOR: DEFAULT_COLOR_ADD_COLOR,
+    CONF_COLOR_DELETE_COLOR: DEFAULT_COLOR_DELETE_COLOR,
+}
 
 
 def _validate_yaml_runtime_data(data: dict[str, Any]) -> None:
@@ -113,7 +122,39 @@ def _schema_default(
     return user_input.get(key, default_dict.get(key, fallback_default))
 
 
-async def _async_build_schema(
+def _normalize_rgb_ui_color_input(color_data: dict[str, Any]) -> str | None:
+    """Normalize submitted RGB UI color data.
+
+    Args:
+        color_data: Submitted color configuration data to validate and update.
+
+    Returns:
+        The translation key for the validation error, or ``None`` when valid.
+
+    """
+    _LOGGER.debug(
+        "Checking Brightness: %s, type: %s",
+        color_data.get(CONF_BRIGHTNESS),
+        type(color_data.get(CONF_BRIGHTNESS)),
+    )
+    brightness_check, brightness_value = is_int_or_list(
+        color_data.get(CONF_BRIGHTNESS),
+        BRIGHTNESS_MIN,
+        BRIGHTNESS_MAX,
+    )
+    if not brightness_check:
+        return ERROR_BRIGHTNESS_NOT_INT_OR_RANGE
+    color_data[CONF_BRIGHTNESS] = brightness_value
+    color_data[CONF_COLOR_WEIGHT] = round(color_data.get(CONF_COLOR_WEIGHT, DEFAULT_COLOR_WEIGHT))
+    color_data[CONF_COLOR_NEARBY_COLORS] = round(
+        color_data.get(CONF_COLOR_NEARBY_COLORS, DEFAULT_COLOR_NEARBY_COLORS)
+    )
+    for key, value in RGB_UI_COLOR_DEFAULTS.items():
+        color_data.setdefault(key, value)
+    return None
+
+
+def _build_schema(
     user_input: dict[str, Any] | None,
     default_dict: dict[str, Any],
     options_flow: bool = False,
@@ -217,7 +258,7 @@ async def _async_build_schema(
     )
 
 
-async def _async_build_color_yaml_schema(
+def _build_color_yaml_schema(
     user_input: dict[str, Any] | None, default_dict: dict[str, Any]
 ) -> vol.Schema:
     """Build a color YAML schema using the default_dict as a backup."""
@@ -244,7 +285,7 @@ async def _async_build_color_yaml_schema(
     return build_schema
 
 
-async def _async_build_color_rgb_ui_schema(
+def _build_color_rgb_ui_schema(
     user_input: dict[str, Any] | None,
     default_dict: dict[str, Any],
     options_flow: bool = False,
@@ -364,20 +405,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, Any] = {}
 
         # Defaults
-        defaults = {
-            CONF_ICON: DEFAULT_ICON,
-            CONF_BRIGHTNESS: DEFAULT_BRIGHTNESS,
-            CONF_ANIMATE_BRIGHTNESS: DEFAULT_ANIMATE_BRIGHTNESS,
-            CONF_ANIMATE_COLOR: DEFAULT_ANIMATE_COLOR,
-            CONF_CHANGE_AMOUNT: DEFAULT_CHANGE_AMOUNT,
-            CONF_CHANGE_FREQUENCY: DEFAULT_CHANGE_FREQUENCY,
-            CONF_CHANGE_SEQUENCE: DEFAULT_CHANGE_SEQUENCE,
-            CONF_RESTORE: DEFAULT_RESTORE,
-            CONF_RESTORE_POWER: DEFAULT_RESTORE_POWER,
-            CONF_IGNORE_OFF: DEFAULT_IGNORE_OFF,
-            CONF_TRANSITION: DEFAULT_TRANSITION,
-            CONF_PRIORITY: DEFAULT_PRIORITY,
-        }
+        defaults = {CONF_ICON: DEFAULT_ICON, **SCENE_DEFAULTS}
 
         if user_input is not None:
             self._data.update(user_input)
@@ -402,7 +430,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="scene",
-            data_schema=await _async_build_schema(user_input, defaults),
+            data_schema=_build_schema(user_input, defaults),
             errors=errors,
         )
 
@@ -433,7 +461,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
         return self.async_show_form(
             step_id="color_yaml",
-            data_schema=await _async_build_color_yaml_schema(user_input, defaults),
+            data_schema=_build_color_yaml_schema(user_input, defaults),
             errors=errors,
             description_placeholders={
                 "component_color_config_url": COMPONENT_COLOR_CONFIG_URL,
@@ -446,46 +474,12 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle color configuration when the user uses the RGB UI selectors."""
         errors: dict[str, Any] = {}
 
-        # Defaults
-        defaults = {
-            CONF_BRIGHTNESS: DEFAULT_BRIGHTNESS,
-            CONF_COLOR_NEARBY_COLORS: DEFAULT_COLOR_NEARBY_COLORS,
-            CONF_COLOR_ONE_CHANGE_PER_TICK: DEFAULT_COLOR_ONE_CHANGE_PER_TICK,
-            CONF_COLOR_WEIGHT: DEFAULT_COLOR_WEIGHT,
-            CONF_COLOR_ADD_COLOR: DEFAULT_COLOR_ADD_COLOR,
-            CONF_COLOR_DELETE_COLOR: DEFAULT_COLOR_DELETE_COLOR,
-        }
-
         if user_input is not None:
-            _LOGGER.debug(
-                "Checking Brightnes: %s, type: %s",
-                user_input.get(CONF_BRIGHTNESS),
-                type(user_input.get(CONF_BRIGHTNESS)),
-            )
-            brightness_check, brightness_value = is_int_or_list(
-                user_input.get(CONF_BRIGHTNESS),
-                BRIGHTNESS_MIN,
-                BRIGHTNESS_MAX,
-            )
-            if brightness_check:
-                user_input.update({CONF_BRIGHTNESS: brightness_value})
-            else:
-                errors["base"] = ERROR_BRIGHTNESS_NOT_INT_OR_RANGE
-            user_input.update(
-                {CONF_COLOR_WEIGHT: round(user_input.get(CONF_COLOR_WEIGHT, DEFAULT_COLOR_WEIGHT))}
-            )
-            user_input.update(
-                {
-                    CONF_COLOR_NEARBY_COLORS: round(
-                        user_input.get(CONF_COLOR_NEARBY_COLORS, DEFAULT_COLOR_NEARBY_COLORS)
-                    )
-                }
-            )
-            for k, v in defaults.items():
-                user_input.setdefault(k, v)
+            if error := _normalize_rgb_ui_color_input(user_input):
+                errors["base"] = error
             if not errors:
                 color_uuid = uuid.random_uuid_hex()
-                self._data.get(CONF_COLOR_RGB_DICT, {}).update({color_uuid: user_input})
+                self._data.setdefault(CONF_COLOR_RGB_DICT, {}).update({color_uuid: user_input})
                 # _LOGGER.debug(f"[async_step_color_rgb_ui] self._data: {self._data}")
                 if user_input.get(CONF_COLOR_ADD_COLOR, False):
                     return await self.async_step_color_rgb_ui()
@@ -501,7 +495,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="color_rgb_ui",
-            data_schema=await _async_build_color_rgb_ui_schema(user_input, defaults),
+            data_schema=_build_color_rgb_ui_schema(user_input, RGB_UI_COLOR_DEFAULTS),
             errors=errors,
             description_placeholders={
                 "color_count": str(len(self._data.get(CONF_COLOR_RGB_DICT, {})) + 1),
@@ -567,20 +561,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         errors: dict[str, Any] = {}
 
         # Defaults
-        defaults = {
-            CONF_ICON: DEFAULT_ICON,
-            CONF_BRIGHTNESS: DEFAULT_BRIGHTNESS,
-            CONF_ANIMATE_BRIGHTNESS: DEFAULT_ANIMATE_BRIGHTNESS,
-            CONF_ANIMATE_COLOR: DEFAULT_ANIMATE_COLOR,
-            CONF_CHANGE_AMOUNT: DEFAULT_CHANGE_AMOUNT,
-            CONF_CHANGE_FREQUENCY: DEFAULT_CHANGE_FREQUENCY,
-            CONF_CHANGE_SEQUENCE: DEFAULT_CHANGE_SEQUENCE,
-            CONF_RESTORE: DEFAULT_RESTORE,
-            CONF_RESTORE_POWER: DEFAULT_RESTORE_POWER,
-            CONF_IGNORE_OFF: DEFAULT_IGNORE_OFF,
-            CONF_TRANSITION: DEFAULT_TRANSITION,
-            CONF_PRIORITY: DEFAULT_PRIORITY,
-        }
+        defaults = {CONF_ICON: DEFAULT_ICON, **SCENE_DEFAULTS}
 
         if user_input is not None:
             self._data.update(user_input)
@@ -602,7 +583,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
 
         return self.async_show_form(
             step_id="scene",
-            data_schema=await _async_build_schema(user_input, self._data, options_flow=True),
+            data_schema=_build_schema(user_input, self._data, options_flow=True),
             errors=errors,
             description_placeholders={"scene_name": self._data[CONF_NAME]},
         )
@@ -644,7 +625,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
 
         return self.async_show_form(
             step_id="color_yaml",
-            data_schema=await _async_build_color_yaml_schema(user_input, self._data),
+            data_schema=_build_color_yaml_schema(user_input, self._data),
             errors=errors,
             description_placeholders={
                 "component_color_config_url": COMPONENT_COLOR_CONFIG_URL,
@@ -657,15 +638,6 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         """Handle color configuration using the RGB UI selectors in options."""
         errors: dict[str, Any] = {}
 
-        # Defaults
-        defaults = {
-            CONF_BRIGHTNESS: DEFAULT_BRIGHTNESS,
-            CONF_COLOR_NEARBY_COLORS: DEFAULT_COLOR_NEARBY_COLORS,
-            CONF_COLOR_ONE_CHANGE_PER_TICK: DEFAULT_COLOR_ONE_CHANGE_PER_TICK,
-            CONF_COLOR_WEIGHT: DEFAULT_COLOR_WEIGHT,
-            CONF_COLOR_ADD_COLOR: DEFAULT_COLOR_ADD_COLOR,
-            CONF_COLOR_DELETE_COLOR: DEFAULT_COLOR_DELETE_COLOR,
-        }
         if self._rgb_ui_color_index + 1 <= self._rgb_ui_color_max:
             color_data = self._rgb_ui_color_values[self._rgb_ui_color_index]
         else:
@@ -673,40 +645,16 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
 
         if user_input is not None:
             color_data.update(user_input)
-            _LOGGER.debug(
-                "Checking Brightnes: %s, type: %s",
-                color_data.get(CONF_BRIGHTNESS),
-                type(color_data.get(CONF_BRIGHTNESS)),
-            )
-            brightness_check, brightness_value = is_int_or_list(
-                color_data.get(CONF_BRIGHTNESS),
-                BRIGHTNESS_MIN,
-                BRIGHTNESS_MAX,
-            )
-            if brightness_check:
-                color_data.update({CONF_BRIGHTNESS: brightness_value})
-            else:
-                errors["base"] = ERROR_BRIGHTNESS_NOT_INT_OR_RANGE
-            color_data.update(
-                {CONF_COLOR_WEIGHT: round(color_data.get(CONF_COLOR_WEIGHT, DEFAULT_COLOR_WEIGHT))}
-            )
-            color_data.update(
-                {
-                    CONF_COLOR_NEARBY_COLORS: round(
-                        color_data.get(CONF_COLOR_NEARBY_COLORS, DEFAULT_COLOR_NEARBY_COLORS)
-                    )
-                }
-            )
-            for k, v in defaults.items():
-                color_data.setdefault(k, v)
+            if error := _normalize_rgb_ui_color_input(color_data):
+                errors["base"] = error
             if not errors:
                 if self._rgb_ui_color_index + 1 <= self._rgb_ui_color_max:
-                    self._data.get(CONF_COLOR_RGB_DICT, {}).update(
+                    self._data.setdefault(CONF_COLOR_RGB_DICT, {}).update(
                         {self._rgb_ui_color_keys[self._rgb_ui_color_index]: color_data}
                     )
                 else:
                     color_uuid = uuid.random_uuid_hex()
-                    self._data.get(CONF_COLOR_RGB_DICT, {}).update({color_uuid: color_data})
+                    self._data.setdefault(CONF_COLOR_RGB_DICT, {}).update({color_uuid: color_data})
                 if self._rgb_ui_color_index + 1 < self._rgb_ui_color_max or (
                     self._rgb_ui_color_index + 1 >= self._rgb_ui_color_max
                     and color_data.get(CONF_COLOR_ADD_COLOR, False)
@@ -736,7 +684,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
 
         return self.async_show_form(
             step_id="color_rgb_ui",
-            data_schema=await _async_build_color_rgb_ui_schema(
+            data_schema=_build_color_rgb_ui_schema(
                 user_input,
                 color_data,
                 options_flow=True,
