@@ -147,12 +147,7 @@ def test_cleanup_update_branches_keeps_current_pr_and_deletes_stale_refs() -> No
 
     result = cleanup.cleanup_update_branches(
         client=client,
-        repository="owner/repo",
-        branch="chore/prek-updates",
-        branch_prefix="chore/prek-updates",
-        label_name="dependencies",
-        author_login="github-actions[bot]",
-        body_marker="Automated update of `prek` hooks.",
+        **_workflow_pull_kwargs(),
         keep_pr_number=10,
         close_stale_prs=True,
         delete_stale_branch=True,
@@ -181,12 +176,7 @@ def test_cleanup_update_branches_deletes_current_stale_branch_when_unprotected()
 
     result = cleanup.cleanup_update_branches(
         client=client,
-        repository="owner/repo",
-        branch="chore/prek-updates",
-        branch_prefix="chore/prek-updates",
-        label_name="dependencies",
-        author_login="github-actions[bot]",
-        body_marker="Automated update of `prek` hooks.",
+        **_workflow_pull_kwargs(),
         keep_pr_number=None,
         close_stale_prs=False,
         delete_stale_branch=True,
