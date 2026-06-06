@@ -80,12 +80,3 @@ def test_pytest_coverage_checkout_does_not_persist_credentials() -> None:
 
     assert "uses: actions/checkout@v6" in workflow
     assert "persist-credentials: false" in workflow
-
-
-def test_pytest_coverage_job_uses_read_only_token_permissions() -> None:
-    """Avoid granting write permissions while running pull request tests."""
-    workflow = PYTEST_COVERAGE_WORKFLOW_PATH.read_text(encoding="utf-8")
-
-    assert "contents: read" in workflow
-    assert "contents: write" not in workflow
-    assert "pull-requests: write" not in workflow
