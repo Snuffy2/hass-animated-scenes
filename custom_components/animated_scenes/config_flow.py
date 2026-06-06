@@ -462,7 +462,15 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_color_yaml(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle color configuration when the user chooses YAML input."""
+        """Handle color configuration when the user chooses YAML input.
+
+        Args:
+            user_input: Submitted YAML color configuration, if any.
+
+        Returns:
+            The next config-flow result for validation, form display, or entry creation.
+
+        """
         errors: dict[str, Any] = {}
 
         if user_input is not None:
@@ -601,7 +609,15 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
     async def async_step_color_yaml(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle color configuration in YAML mode within the options flow."""
+        """Handle color configuration in YAML mode within the options flow.
+
+        Args:
+            user_input: Submitted YAML color configuration, if any.
+
+        Returns:
+            The next options-flow result for validation, form display, or entry update.
+
+        """
         errors: dict[str, Any] = {}
 
         if user_input is not None:
@@ -659,13 +675,23 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                     self._rgb_ui_color_index += 1
                     return await self.async_step_color_rgb_ui()
                 self._data.update({CONF_COLORS: {}})
-                self._data.update(
-                    {
-                        CONF_COLOR_RGB_DICT: clean_color_rgb_dict(
-                            self._data.get(CONF_COLOR_RGB_DICT, {})
-                        )
-                    }
+                cleaned_color_rgb_dict = clean_color_rgb_dict(
+                    self._data.get(CONF_COLOR_RGB_DICT, {})
                 )
+                if not cleaned_color_rgb_dict:
+                    errors["base"] = ERROR_COLORS_IS_BLANK
+                    return self.async_show_form(
+                        step_id="color_rgb_ui",
+                        data_schema=_build_color_rgb_ui_schema(
+                            user_input,
+                            color_data,
+                            options_flow=True,
+                            is_last_color=True,
+                        ),
+                        errors=errors,
+                        description_placeholders={"scene_name": self._data[CONF_NAME]},
+                    )
+                self._data.update({CONF_COLOR_RGB_DICT: cleaned_color_rgb_dict})
                 await self._async_stop_previous_animation_if_renamed()
                 self.hass.config_entries.async_update_entry(
                     self.config,

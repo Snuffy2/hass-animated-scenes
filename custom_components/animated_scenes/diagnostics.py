@@ -17,7 +17,7 @@ from .animations import Animations
 
 _LOGGER = logging.getLogger(__name__)
 
-TO_REDACT = {"animated_scene_switch", "entity_id", "lights", "name"}
+TO_REDACT: set[str] = {"animated_scene_switch", "entity_id", "lights", "name"}
 
 
 def _redact(value: Any) -> Any:

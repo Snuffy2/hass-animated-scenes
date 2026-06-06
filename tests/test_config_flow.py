@@ -17,6 +17,7 @@ from custom_components.animated_scenes.const import (
     COLOR_SELECTOR_RGB_UI,
     COLOR_SELECTOR_YAML,
     CONF_COLOR,
+    CONF_COLOR_DELETE_COLOR,
     CONF_COLOR_NEARBY_COLORS,
     CONF_COLOR_RGB_DICT,
     CONF_COLOR_SELECTOR_MODE,
@@ -166,6 +167,34 @@ async def test_options_rgb_ui_invalid_edit_does_not_mutate_entry_data(
 
     assert result["type"] == "form"
     assert result["errors"] == {"base": ERROR_BRIGHTNESS_NOT_INT_OR_RANGE}
+    assert entry.data[CONF_COLOR_RGB_DICT] == {"red": stored_color}
+
+
+async def test_options_rgb_ui_rejects_deleting_only_color(
+    hass: HomeAssistant,
+) -> None:
+    """Reject options edits that would leave an RGB UI scene with no colors."""
+    stored_color = {
+        CONF_COLOR: [255, 0, 0],
+        CONF_BRIGHTNESS: DEFAULT_BRIGHTNESS,
+        CONF_COLOR_WEIGHT: DEFAULT_COLOR_WEIGHT,
+        CONF_COLOR_NEARBY_COLORS: DEFAULT_COLOR_NEARBY_COLORS,
+    }
+    flow, entry = _options_flow(
+        hass,
+        selector_mode=COLOR_SELECTOR_RGB_UI,
+        color_rgb_dict={"red": stored_color},
+    )
+
+    result = await flow.async_step_color_rgb_ui(
+        {
+            **stored_color,
+            CONF_COLOR_DELETE_COLOR: True,
+        }
+    )
+
+    assert result["type"] == "form"
+    assert result["errors"] == {"base": ERROR_COLORS_IS_BLANK}
     assert entry.data[CONF_COLOR_RGB_DICT] == {"red": stored_color}
 
 
