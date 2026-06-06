@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import cast
 from unittest.mock import AsyncMock, patch
 
@@ -234,3 +235,20 @@ async def test_options_yaml_rejects_invalid_colors(
     errors = result["errors"]
     assert errors is not None
     assert errors["base"] == expected_error
+
+
+async def test_options_yaml_logs_runtime_validation_error(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Leave a debug trail when runtime schema rejects YAML colors."""
+    flow, _ = _options_flow(hass)
+    caplog.set_level(logging.DEBUG, "custom_components.animated_scenes.config_flow")
+
+    result = await flow.async_step_color_yaml(
+        {CONF_COLORS: [{"color_type": "rgb_color", "color": [255, 0]}]}
+    )
+
+    assert result["type"] == "form"
+    assert result["errors"] == {"base": ERROR_COLORS_MALFORMED}
+    assert "Invalid YAML color payload" in caplog.text

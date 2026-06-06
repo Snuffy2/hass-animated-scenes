@@ -674,6 +674,7 @@ class Animation:
         If `ignore_off` is enabled the method filters out lights that are
         currently off when selecting a random subset.
         """
+        change_amount = max(0, min(change_amount, len(self._active_lights)))
         if not self._ignore_off:
             to_change: list = []
             randomized_list: list = sample(self._active_lights, k=change_amount)
@@ -910,6 +911,8 @@ class Animations:
             self.light_owner[light] = animation
         if light not in self._light_animations:
             self._light_animations[light] = []
+        if animation in self._light_animations[light]:
+            return
         self._light_animations[light].append(animation)
 
     async def start(self, data: dict[str, Any]) -> None:

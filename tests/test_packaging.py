@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONST_PATH = REPO_ROOT / "custom_components" / "animated_scenes" / "const.py"
 PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
 POST_COVERAGE_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "post_coverage_to_pr.yml"
+PYTEST_COVERAGE_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "pytest_coverage.yml"
 RELEASE_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "release.yml"
 
 
@@ -71,3 +72,12 @@ def test_post_coverage_workflow_skips_prs_without_comment_artifacts() -> None:
     assert "labels.includes('dependencies')" in workflow
     assert "pullRequest.user?.type !== 'Bot'" in workflow
     assert "if: steps.coverage_eligibility.outputs.should_post == 'true'" in workflow
+
+
+def test_pytest_coverage_checkout_does_not_persist_credentials() -> None:
+    """Avoid leaving the workflow token in git config after checkout."""
+    workflow = PYTEST_COVERAGE_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert (
+        "uses: actions/checkout@v6\n        with:\n          persist-credentials: false" in workflow
+    )

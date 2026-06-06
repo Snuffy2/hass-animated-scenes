@@ -1,12 +1,11 @@
 """Tests for the prek autoupdate workflow."""
 
-from collections.abc import Generator
+from __future__ import annotations
+
 from email.message import Message
-from importlib import util
 from io import BytesIO
 from pathlib import Path
 import re
-import sys
 from types import ModuleType
 from urllib.error import HTTPError, URLError
 
@@ -15,7 +14,6 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_SCRIPT_PATH = ".github/scripts/cleanup_prek_update_branches.py"
 WORKFLOW_PATH = REPO_ROOT / ".github/workflows/prek_autoupdate.yml"
-CLEANUP_SCRIPT_PATH = REPO_ROOT / WORKFLOW_SCRIPT_PATH
 WORKFLOW_BRANCH = "chore/prek-updates"
 WORKFLOW_LABEL = "dependencies"
 WORKFLOW_AUTHOR = "github-actions[bot]"
@@ -106,25 +104,6 @@ def _workflow_pull(
         "head": {"ref": ref, "repo": {"full_name": repository}},
         "labels": [{"name": label}],
     }
-
-
-@pytest.fixture
-def cleanup_script() -> Generator[ModuleType]:
-    """Load the prek cleanup script as a test module."""
-    spec = util.spec_from_file_location("cleanup_prek_update_branches", CLEANUP_SCRIPT_PATH)
-    assert spec is not None
-    assert spec.loader is not None
-    module = util.module_from_spec(spec)
-    previous_module = sys.modules.get("cleanup_prek_update_branches")
-    sys.modules["cleanup_prek_update_branches"] = module
-    spec.loader.exec_module(module)
-    try:
-        yield module
-    finally:
-        if previous_module is None:
-            sys.modules.pop("cleanup_prek_update_branches", None)
-        else:
-            sys.modules["cleanup_prek_update_branches"] = previous_module
 
 
 @pytest.mark.parametrize(

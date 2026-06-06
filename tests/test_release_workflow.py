@@ -1,16 +1,15 @@
 """Release-workflow tests that protect versioning and tag-update behavior."""
 
-from importlib import util
+from __future__ import annotations
+
 import json
 from pathlib import Path
-import sys
 from types import ModuleType
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github/workflows/release.yml"
-SCRIPT_PATH = REPO_ROOT / ".github/scripts/update_release_version.py"
 WORKFLOW_SCRIPT_PATH = ".github/scripts/update_release_version.py"
 
 
@@ -34,25 +33,6 @@ def _step_block(workflow: str, step_name: str) -> str:
     step_index = workflow.index(step_label)
     next_step_index = workflow.find("\n      - name:", step_index + len(step_label))
     return workflow[step_index:] if next_step_index == -1 else workflow[step_index:next_step_index]
-
-
-@pytest.fixture
-def release_version_script() -> ModuleType:
-    """Load the checked-in release version script as an importable module."""
-    spec = util.spec_from_file_location("update_release_version", SCRIPT_PATH)
-    assert spec is not None
-    assert spec.loader is not None
-    module = util.module_from_spec(spec)
-    previous_module = sys.modules.get("update_release_version")
-    sys.modules["update_release_version"] = module
-    spec.loader.exec_module(module)
-    try:
-        return module
-    finally:
-        if previous_module is None:
-            sys.modules.pop("update_release_version", None)
-        else:
-            sys.modules["update_release_version"] = previous_module
 
 
 def test_edited_release_checkout_uses_release_tag() -> None:
@@ -115,6 +95,10 @@ def test_release_workflow_runs_checked_in_version_update_script() -> None:
     [
         ('"""Constants."""\n\nVERSION = "v0.1.0"\nDOMAIN = "animated_scenes"\n', None),
         ('"""Constants."""\n\nDOMAIN = "animated_scenes"\n', "VERSION assignment"),
+        (
+            '"""Constants."""\n\nVERSION = "v0.1.0"\nVERSION = "v0.2.0"\n',
+            "exactly one VERSION assignment",
+        ),
     ],
 )
 def test_release_version_script_updates_manifest_and_const(

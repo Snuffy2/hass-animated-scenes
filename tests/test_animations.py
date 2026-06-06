@@ -296,6 +296,24 @@ async def test_add_lights_to_animation_updates_refresh_membership(
 
 
 @pytest.mark.asyncio
+async def test_add_lights_to_animation_deduplicates_runtime_ownership(
+    hass: HomeAssistant,
+) -> None:
+    """Avoid stale ownership entries when the same light is added repeatedly."""
+    manager = _runtime_manager(hass)
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+    hass.states.async_set("light.two", "on", {"brightness": 100, "color_mode": "rgb"})
+    animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
+    manager.animations[animation.name] = animation
+
+    await manager.add_lights_to_animation({CONF_NAME: "Spooky", CONF_LIGHTS: ["light.two"]})
+    await manager.add_lights_to_animation({CONF_NAME: "Spooky", CONF_LIGHTS: ["light.two"]})
+
+    assert animation.lights.count("light.two") == 1
+    assert manager._light_animations["light.two"].count(animation) == 1
+
+
+@pytest.mark.asyncio
 async def test_add_lights_to_animation_rejects_missing_switch(
     hass: HomeAssistant,
 ) -> None:
@@ -360,6 +378,26 @@ async def test_start_clamps_oversized_change_amount(hass: HomeAssistant) -> None
     )
 
     assert "Spooky" not in manager.animations
+
+
+@pytest.mark.asyncio
+async def test_update_lights_clamps_change_amount_to_active_lights(
+    hass: HomeAssistant,
+) -> None:
+    """Clamp runtime sampling after the active light set changes."""
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+    animation = Animation(
+        hass,
+        {
+            **_animation_config("Spooky", ["light.one"]),
+            "change_amount": 3,
+        },
+    )
+
+    with patch.object(animation, "update_light", AsyncMock()) as update_light:
+        await animation.update_lights()
+
+    update_light.assert_awaited_once_with("light.one")
 
 
 @pytest.mark.asyncio

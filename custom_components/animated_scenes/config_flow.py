@@ -131,7 +131,8 @@ def _validate_color_yaml_data(data: dict[str, Any]) -> str | None:
         return ERROR_COLORS_MALFORMED
     try:
         _validate_yaml_runtime_data(data)
-    except vol.Invalid:
+    except vol.Invalid as err:
+        _LOGGER.debug("Invalid YAML color payload: %s", err)
         return ERROR_COLORS_MALFORMED
     return None
 

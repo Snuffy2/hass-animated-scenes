@@ -60,9 +60,10 @@ def _update_const_version(*, const_path: Path, tag_name: str) -> None:
     """
     const_text = const_path.read_text()
     version_line = f"VERSION = {json.dumps(tag_name)}"
-    updated_text, replacements = VERSION_PATTERN.subn(version_line, const_text, count=1)
+    replacements = len(VERSION_PATTERN.findall(const_text))
     if replacements != 1:
-        raise ValueError(f"{const_path} does not contain a VERSION assignment")
+        raise ValueError(f"{const_path} must contain exactly one VERSION assignment")
+    updated_text = VERSION_PATTERN.sub(version_line, const_text, count=1)
     const_path.write_text(updated_text)
 
 
