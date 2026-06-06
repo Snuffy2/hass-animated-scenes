@@ -1041,23 +1041,15 @@ class Animations:
                 current_owner.name,
             )
             return
-        if animations_for_light:
+        if animations_for_light and not skip_ownership:
             light_owner = self.refresh_animation_for_light(entity_id)
             if light_owner:
                 self.light_owner[entity_id] = light_owner
-                if skip_ownership:
-                    _LOGGER.info(
-                        "Keeping owner %s for light %s after releasing %s",
-                        light_owner.name,
-                        entity_id,
-                        animation.name,
-                    )
-                else:
-                    _LOGGER.info(
-                        "Changing owner from %s to %s",
-                        animation.name,
-                        light_owner.name,
-                    )
+                _LOGGER.info(
+                    "Changing owner from %s to %s",
+                    animation.name,
+                    light_owner.name,
+                )
                 return
         if animation.restore and not skip_restore and entity_id in self.states:
             previous_state = self.states[entity_id]

@@ -233,15 +233,15 @@ async def test_release_light_hands_owner_to_next_priority(hass: HomeAssistant) -
 
 
 @pytest.mark.asyncio
-async def test_release_light_skip_ownership_keeps_remaining_owner(
+async def test_release_light_skip_ownership_removes_owner(
     hass: HomeAssistant,
 ) -> None:
-    """Keep an existing owner when removal skips priority reassignment.
+    """Remove ownership when removal skips priority reassignment.
 
     The ``remove_lights`` service calls ``release_light`` with
     ``skip_ownership=True`` after removing a light from one animation. If
-    another animation still tracks that light, the manager must retain a
-    coherent owner so the remaining animation can keep ticking safely.
+    another animation still tracks that light, the manager must not hand the
+    light back to that lower-priority animation.
     """
     manager = _runtime_manager(hass)
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
@@ -255,9 +255,9 @@ async def test_release_light_skip_ownership_keeps_remaining_owner(
 
     await manager.release_light(removed, "light.one", skip_ownership=True)
 
-    assert manager.light_owner["light.one"] is remaining
+    assert "light.one" not in manager.light_owner
     assert manager._light_animations["light.one"] == [remaining]
-    assert "light.one" in manager.states
+    assert "light.one" not in manager.states
 
 
 @pytest.mark.asyncio

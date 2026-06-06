@@ -59,7 +59,7 @@ To edit a scene later, open the scene entry from **Settings > Devices & Services
 | `name` | The scene name. This is also the animation name used by services. |
 | `priority` | Higher-priority animations win when multiple animations want the same light. |
 | `transition` | How long each light transition takes, in seconds. |
-| `change_frequency` | How often the animation changes lights, in seconds. Use `0` to apply one update and then release the lights. |
+| `change_frequency` | How often the animation changes lights, in seconds. Must be greater than `0`. |
 | `change_amount` | How many lights change each tick. Use a number, a range like `[1, 3]`, or `all`. |
 | `ignore_off` | When enabled, the animation ignores the current off state and includes those lights. When disabled, lights that are off are skipped. |
 | `restore` | Restore previous light state when the animation ends. |
@@ -262,13 +262,11 @@ Animated Scenes validates UI configuration and service calls before starting an 
 | Field | Allowed values |
 | --- | --- |
 | `transition` | `0` to `6553` seconds, or a two-item range like `[0.5, 2]`. |
-| `change_frequency` | `0` to `60` seconds, or a two-item range like `[0.25, 1.5]`. Ranges must be greater than `0`. |
+| `change_frequency` | Greater than `0` and up to `3600` seconds, or a two-item range like `[0.25, 1.5]`. Each range bound must be greater than `0`. |
 | `change_amount` | An integer, a two-item range like `[1, 3]`, or `all`. |
 | `brightness` | `0` to `255`, or a two-item range like `[70, 255]`. |
 | `colors` | At least one color is required. |
 | `lights` | At least one light is required. |
-
-When `change_frequency` is `0`, the animation applies its first update once, releases the lights, and the switch returns to off.
 
 When a scene is reloaded, removed, or unloaded, any matching running animation is stopped and its light ownership is released.
 

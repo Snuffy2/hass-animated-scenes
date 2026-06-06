@@ -13,10 +13,8 @@ jobs:
     name: pytest and coverage report
     runs-on: ubuntu-latest
     permissions:
-      # Required by python-coverage-comment-action to publish PR comments and
-      # maintain its coverage dashboard data. Fork PR tokens are downgraded by GitHub.
-      contents: write
-      pull-requests: write
+      # Keep the test job token read-only while it executes pull request code.
+      contents: read
 
     steps:
       - name: Checkout Repository
