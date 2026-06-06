@@ -129,7 +129,7 @@ def test_normalize_scene_input_accepts_fractional_runtime_timings() -> None:
     [
         (CONF_CHANGE_AMOUNT, "bad", "change_amount_not_int_or_all"),
         ("transition", "[1, bad]", "transition_not_int_or_range"),
-        ("change_frequency", "61", "change_frequency_not_int_or_range"),
+        ("change_frequency", "0", "change_frequency_not_int_or_range"),
         (CONF_BRIGHTNESS, "300", "brightness_not_int_or_range"),
         (CONF_LIGHTS, None, "must_select_lights"),
         (CONF_PRIORITY, "high", "priority must be a number"),
@@ -182,6 +182,16 @@ def test_validate_start_service_data_accepts_templated_numeric_ranges() -> None:
     assert result[CONF_CHANGE_FREQUENCY] == [0.25, 1.5]
 
 
+def test_validate_start_service_data_accepts_hourly_change_frequency() -> None:
+    """Accept change_frequency values up to one hour."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_CHANGE_FREQUENCY] = "3600"
+
+    result = validate_start_service_data(data)
+
+    assert result[CONF_CHANGE_FREQUENCY] == 3600
+
+
 @pytest.mark.parametrize(
     CONF_BRIGHTNESS,
     [(0.5,), ("0.5",), ([1, 2.5],), ("[1, 2.5]",)],
@@ -202,8 +212,10 @@ def test_validate_start_service_data_rejects_fractional_brightness(
     [
         -1,
         "-1",
-        61,
-        "61",
+        0,
+        "0",
+        3600.1,
+        "3600.1",
         pytest.param([0, 1], id="zero_int_range"),
         pytest.param([0.0, 0.5], id="zero_float_range"),
     ],

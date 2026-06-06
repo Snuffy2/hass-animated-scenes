@@ -373,11 +373,11 @@ async def test_start_clamps_oversized_change_amount(hass: HomeAssistant) -> None
         {
             **_animation_config("Spooky", ["light.one"]),
             "change_amount": 2,
-            "change_frequency": 0,
         }
     )
 
-    assert "Spooky" not in manager.animations
+    assert manager.animations["Spooky"].get_change_amount() == 1
+    await manager.stop({"name": "Spooky"})
 
 
 @pytest.mark.asyncio
@@ -418,12 +418,12 @@ async def test_start_service_accepts_text_change_amount(
         {
             **_animation_config("Spooky", ["light.one"]),
             "change_amount": change_amount,
-            "change_frequency": 0,
         },
         blocking=True,
     )
 
-    assert manager.animations == {}
+    assert manager.animations["Spooky"].get_change_amount() == 1
+    await manager.stop({"name": "Spooky"})
 
 
 @pytest.mark.parametrize(

@@ -127,10 +127,20 @@ TRANSITION_VALUE_SCHEMA = vol.All(
     vol.Coerce(float), vol.Range(min=TRANSITION_MIN, max=TRANSITION_MAX)
 )
 CHANGE_FREQUENCY_VALUE_SCHEMA = vol.All(
-    vol.Coerce(float), vol.Range(min=CHANGE_FREQUENCY_MIN, max=CHANGE_FREQUENCY_MAX)
+    vol.Coerce(float),
+    vol.Range(
+        min=CHANGE_FREQUENCY_MIN,
+        max=CHANGE_FREQUENCY_MAX,
+        min_included=False,
+    ),
 )
 CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA = vol.All(
-    vol.Coerce(float), vol.Range(min=1e-9, max=CHANGE_FREQUENCY_MAX)
+    vol.Coerce(float),
+    vol.Range(
+        min=CHANGE_FREQUENCY_MIN,
+        max=CHANGE_FREQUENCY_MAX,
+        min_included=False,
+    ),
 )
 CHANGE_AMOUNT_VALUE_SCHEMA = vol.All(
     vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)
@@ -370,16 +380,20 @@ def is_int_or_list(
 
 
 def is_number_or_list(
-    value: Any, min_value: float | None = None, max_value: float | None = None
+    value: Any,
+    min_value: float | None = None,
+    max_value: float | None = None,
+    min_included: bool = True,
 ) -> tuple[bool, Any]:
     """Validate and normalize a number or two-item numeric range."""
     if value is None:
         return True, value
     is_number_check, number_value = is_number(value)
     if is_number_check:
-        if (min_value is None or number_value >= min_value) and (
-            max_value is None or number_value <= max_value
-        ):
+        above_min = min_value is None or (
+            number_value >= min_value if min_included else number_value > min_value
+        )
+        if above_min and (max_value is None or number_value <= max_value):
             return True, number_value
         return False, value
     if isinstance(value, str):
@@ -394,9 +408,11 @@ def is_number_or_list(
         if not (is_first and is_second):
             return False, value
         normalized = [min(first, second), max(first, second)]
-        if (min_value is None or min(normalized) >= min_value) and (
-            max_value is None or max(normalized) <= max_value
-        ):
+        lowest = min(normalized)
+        above_min = min_value is None or (
+            lowest >= min_value if min_included else lowest > min_value
+        )
+        if above_min and (max_value is None or max(normalized) <= max_value):
             if normalized[0] == normalized[1]:
                 return True, normalized[0]
             return True, normalized
@@ -455,11 +471,12 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
     normalized[CONF_TRANSITION] = transition_value
 
     frequency_ok, frequency_value = is_number_or_list(
-        normalized.get(CONF_CHANGE_FREQUENCY), CHANGE_FREQUENCY_MIN, CHANGE_FREQUENCY_MAX
+        normalized.get(CONF_CHANGE_FREQUENCY),
+        CHANGE_FREQUENCY_MIN,
+        CHANGE_FREQUENCY_MAX,
+        min_included=False,
     )
     if not frequency_ok:
-        raise vol.Invalid(ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE)
-    if isinstance(frequency_value, list) and min(frequency_value) <= 0:
         raise vol.Invalid(ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE)
     normalized[CONF_CHANGE_FREQUENCY] = frequency_value
 
