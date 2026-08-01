@@ -750,33 +750,13 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                 )
                 if not cleaned_color_rgb_dict:
                     errors["base"] = ERROR_COLORS_IS_BLANK
-                    return self.async_show_form(
-                        step_id="color_rgb_ui",
-                        data_schema=_build_color_rgb_ui_schema(
-                            user_input,
-                            color_data,
-                            options_flow=True,
-                            is_last_color=True,
-                        ),
-                        errors=errors,
-                        description_placeholders={"scene_name": self._data[CONF_NAME]},
-                    )
-                self._data.update({CONF_COLOR_RGB_DICT: cleaned_color_rgb_dict})
-                if error := _validate_rgb_ui_runtime_data(self._data):
-                    errors["base"] = error
-                    return self.async_show_form(
-                        step_id="color_rgb_ui",
-                        data_schema=_build_color_rgb_ui_schema(
-                            user_input,
-                            color_data,
-                            options_flow=True,
-                            is_last_color=True,
-                        ),
-                        errors=errors,
-                        description_placeholders={"scene_name": self._data[CONF_NAME]},
-                    )
-                if _scene_name_exists(self.hass, self._data[CONF_NAME], self.config.entry_id):
-                    errors["base"] = ERROR_SCENE_NAME_EXISTS
+                else:
+                    self._data.update({CONF_COLOR_RGB_DICT: cleaned_color_rgb_dict})
+                    if error := _validate_rgb_ui_runtime_data(self._data):
+                        errors["base"] = error
+                    elif _scene_name_exists(self.hass, self._data[CONF_NAME], self.config.entry_id):
+                        errors["base"] = ERROR_SCENE_NAME_EXISTS
+                if errors:
                     return self.async_show_form(
                         step_id="color_rgb_ui",
                         data_schema=_build_color_rgb_ui_schema(

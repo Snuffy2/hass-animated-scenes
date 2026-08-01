@@ -31,19 +31,10 @@ async def test_diagnostics_redacts_entity_ids_and_reports_runtime(
     assert diagnostics["runtime"]["active_light_count"] == 1
 
 
-@pytest.mark.parametrize(
-    "manager",
-    [
-        pytest.param(None, id="without_manager"),
-        pytest.param(object(), id="invalid_manager"),
-    ],
-)
 @pytest.mark.asyncio
-async def test_diagnostics_reports_zero_runtime(
-    hass: HomeAssistant, manager: object | None
-) -> None:
-    """Return zero runtime counters when no valid animation manager is active."""
-    Animations.instance = manager  # type: ignore[assignment]
+async def test_diagnostics_reports_zero_runtime(hass: HomeAssistant) -> None:
+    """Return zero runtime counters before the animation manager is initialized."""
+    Animations.instance = None
 
     diagnostics = await async_get_config_entry_diagnostics(hass, _diagnostic_entry())
 

@@ -984,35 +984,6 @@ class Animations:
                 await animation.release()
             self.animations.pop(name, None)
 
-    async def stop_all(self) -> None:
-        """Stop every animation currently managed by this integration.
-
-        Returns:
-            None. The method snapshots current animations before awaiting so
-            individual stop calls can mutate the manager safely.
-
-        """
-        async with self._mutation_lock:
-            animations = list(self.animations.values())
-            await asyncio.gather(*(animation.stop() for animation in animations))
-
-    def clear_runtime_state(self) -> None:
-        """Clear listeners and all runtime ownership maps.
-
-        Returns:
-            None. This is intended for full integration teardown after all
-            config entries have unloaded.
-
-        """
-        if self._external_light_listener is not None:
-            self._external_light_listener()
-            self._external_light_listener = None
-        self.animations.clear()
-        self.states.clear()
-        self._light_animations.clear()
-        self.light_owner.clear()
-        self._conflicted_lights.clear()
-
     def fire_animation_change(self, animation_name: str, state: str) -> None:
         """Notify Home Assistant that animation activity changed."""
         self.hass.bus.fire(

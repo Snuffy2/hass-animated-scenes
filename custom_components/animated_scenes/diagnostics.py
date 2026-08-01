@@ -7,15 +7,12 @@ identifiers that could expose user-specific rooms, devices, or naming schemes.
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .animations import Animations
-
-_LOGGER = logging.getLogger(__name__)
 
 TO_REDACT: set[str] = {"animated_scene_switch", "entity_id", "lights", "name"}
 
@@ -67,19 +64,15 @@ async def async_get_config_entry_diagnostics(
 
 
 def _runtime_diagnostics() -> dict[str, int]:
-    """Return runtime animation counters, falling back to zeros on bad state."""
+    """Return runtime animation counters, or zeros before manager initialization."""
     manager = Animations.instance
     if manager is None:
         return _zero_runtime_diagnostics()
-    try:
-        return {
-            "active_animation_count": len(manager.animations),
-            "active_light_count": len(manager.light_owner),
-            "stored_state_count": len(manager.states),
-        }
-    except (AttributeError, TypeError) as err:
-        _LOGGER.debug("Unable to collect Animated Scenes runtime diagnostics: %s", err)
-        return _zero_runtime_diagnostics()
+    return {
+        "active_animation_count": len(manager.animations),
+        "active_light_count": len(manager.light_owner),
+        "stored_state_count": len(manager.states),
+    }
 
 
 def _zero_runtime_diagnostics() -> dict[str, int]:
