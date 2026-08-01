@@ -67,18 +67,13 @@ def _runtime_diagnostics() -> dict[str, int]:
     """Return runtime animation counters, or zeros before manager initialization."""
     manager = Animations.instance
     if manager is None:
-        return _zero_runtime_diagnostics()
+        return {
+            "active_animation_count": 0,
+            "active_light_count": 0,
+            "stored_state_count": 0,
+        }
     return {
         "active_animation_count": len(manager.animations),
         "active_light_count": len(manager.light_owner),
         "stored_state_count": len(manager.states),
-    }
-
-
-def _zero_runtime_diagnostics() -> dict[str, int]:
-    """Return zeroed runtime diagnostic counters."""
-    return {
-        "active_animation_count": 0,
-        "active_light_count": 0,
-        "stored_state_count": 0,
     }
