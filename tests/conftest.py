@@ -16,7 +16,6 @@ from custom_components.animated_scenes.const import DOMAIN
 pytest_plugins = ("pytest_homeassistant_custom_component",)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CLEANUP_SCRIPT_PATH = REPO_ROOT / ".github/scripts/cleanup_prek_update_branches.py"
 RELEASE_VERSION_SCRIPT_PATH = REPO_ROOT / ".github/scripts/update_release_version.py"
 
 
@@ -84,17 +83,6 @@ def _load_script_module(module_name: str, script_path: Path) -> Iterator[ModuleT
             sys.modules.pop(module_name, None)
         else:
             sys.modules[module_name] = previous_module
-
-
-@pytest.fixture
-def cleanup_script() -> Iterator[ModuleType]:
-    """Load the prek cleanup script as an importable module.
-
-    Yields:
-        ModuleType: The loaded cleanup script module.
-
-    """
-    yield from _load_script_module("cleanup_prek_update_branches", CLEANUP_SCRIPT_PATH)
 
 
 @pytest.fixture
