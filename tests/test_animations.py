@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import suppress
 from types import MappingProxyType, SimpleNamespace
-from typing import cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.components.light import ATTR_COLOR_TEMP_KELVIN
@@ -493,6 +493,37 @@ async def test_remove_lights_removes_overlapping_light_from_every_animation(
     assert "light.one" not in manager._light_animations
     assert "light.one" not in manager.light_owner
     assert all(call.args[3]["entity_id"] != "light.one" for call in safe_call.await_args_list)
+
+
+@pytest.mark.asyncio
+async def test_remove_lights_restore_event_ignores_untracked_light(
+    hass: HomeAssistant,
+) -> None:
+    """Ignore restoration events after removal has cleared light tracking."""
+    manager = _runtime_manager(hass)
+    animation = _tracked_animation(hass, manager)
+    restore_event = SimpleNamespace(
+        data={
+            "entity_id": "light.one",
+            "old_state": SimpleNamespace(state="off"),
+            "new_state": SimpleNamespace(state="on"),
+        }
+    )
+
+    async def restore_with_state_event(*_: object) -> None:
+        """Deliver the restoration state event during the service call."""
+        await manager._handle_external_light_change(cast("Any", restore_event))
+
+    with patch(
+        "custom_components.animated_scenes.animations.safe_call",
+        side_effect=restore_with_state_event,
+    ):
+        await manager.remove_lights({CONF_LIGHTS: ["light.one"]})
+
+    assert animation.get_active_lights() == []
+    assert "light.one" not in manager.states
+    assert "light.one" not in manager.light_owner
+    assert "light.one" not in manager._light_animations
 
 
 @pytest.mark.asyncio

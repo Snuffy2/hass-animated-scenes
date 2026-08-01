@@ -121,4 +121,7 @@ def test_pr_coverage_comment_posting_remains_delegated() -> None:
     assert "workflow_run:" in post_workflow
     assert "workflows: ['pytest and coverage']" in post_workflow
     assert "pull-requests: write" in post_workflow
+    assert "contents: read" in post_workflow
+    assert "contents: write" not in post_workflow
+    assert "actions: read" in post_workflow
     assert "GITHUB_PR_RUN_ID: ${{ github.event.workflow_run.id }}" in post_workflow

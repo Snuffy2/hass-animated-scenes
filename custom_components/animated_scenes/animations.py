@@ -876,6 +876,8 @@ class Animations:
         animation is responsible for it.
         """
         entity_id = event.data["entity_id"]
+        if entity_id not in self._light_animations:
+            return
         new_state = event.data.get("new_state")
         old_state = event.data.get("old_state")
         if not (new_state and old_state):
@@ -901,7 +903,7 @@ class Animations:
     def refresh_animation_for_light(self, entity_id: str) -> Animation | None:
         """Pick the highest-priority animation that targets the given light."""
         selected: Animation | None = None
-        for animation in self._light_animations[entity_id]:
+        for animation in self._light_animations.get(entity_id, []):
             if entity_id in animation.lights and (
                 selected is None or animation.priority > selected.priority
             ):
