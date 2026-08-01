@@ -267,6 +267,18 @@ def test_validate_start_service_data_rejects_invalid_colors(colors: list[object]
         validate_start_service_data(data)
 
 
+def test_validate_start_service_data_rejects_all_zero_color_weights() -> None:
+    """Reject color groups that leave random selection with no usable color."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_COLORS] = [
+        {"color_type": "rgb_color", "color": [255, 0, 0], "weight": 0},
+        {"color_type": "rgb_color", "color": [0, 0, 255], "weight": 0},
+    ]
+
+    with pytest.raises(vol.Invalid, match="colors_malformed"):
+        validate_start_service_data(data)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

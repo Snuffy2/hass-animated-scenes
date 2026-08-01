@@ -63,6 +63,7 @@ from .const import (
     ERROR_BRIGHTNESS_NOT_INT_OR_RANGE,
     ERROR_CHANGE_AMOUNT_NOT_INT_OR_ALL,
     ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE,
+    ERROR_COLORS_MALFORMED,
     ERROR_MUST_SELECT_LIGHTS,
     ERROR_TRANSITION_NOT_INT_OR_RANGE,
     TRANSITION_MAX,
@@ -204,6 +205,25 @@ COLOR_GROUP_SCHEMA = {
     ): vol.Range(min=0, max=10),
 }
 
+
+def _validate_color_weights(colors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Require at least one selectable color while allowing zero-weight colors.
+
+    Args:
+        colors: Validated color configuration groups.
+
+    Returns:
+        The unchanged color groups when their total weight is positive.
+
+    Raises:
+        vol.Invalid: If every configured color has zero weight.
+
+    """
+    if sum(color[CONF_COLOR_WEIGHT] for color in colors) <= 0:
+        raise vol.Invalid(ERROR_COLORS_MALFORMED)
+    return colors
+
+
 START_SERVICE_CONFIG = {
     vol.Required(CONF_NAME): cv.string,
     vol.Optional(CONF_IGNORE_OFF, default=DEFAULT_IGNORE_OFF): bool,
@@ -286,6 +306,7 @@ START_SERVICE_CONFIG = {
                 ).extend(COLOR_GROUP_SCHEMA),
             )
         ],
+        _validate_color_weights,
     ),
 }
 

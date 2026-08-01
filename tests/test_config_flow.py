@@ -162,6 +162,28 @@ async def test_options_rgb_ui_handles_empty_existing_color_dict(hass: HomeAssist
     assert result["step_id"] == "color_rgb_ui"
 
 
+async def test_new_rgb_ui_rejects_missing_color(hass: HomeAssistant) -> None:
+    """Reject a new RGB UI color submission without a selected color."""
+    flow = AnimatedScenesConfigFlow()
+    flow.hass = hass
+
+    result = await flow.async_step_color_rgb_ui({CONF_BRIGHTNESS: 100})
+
+    assert result["type"] == "form"
+    assert result["errors"] == {"base": ERROR_COLORS_IS_BLANK}
+
+
+async def test_options_rgb_ui_rejects_missing_color(hass: HomeAssistant) -> None:
+    """Reject an options RGB UI submission whose color is missing."""
+    flow, entry = _options_flow(hass, selector_mode=COLOR_SELECTOR_RGB_UI)
+
+    result = await flow.async_step_color_rgb_ui({CONF_BRIGHTNESS: 100})
+
+    assert result["type"] == "form"
+    assert result["errors"] == {"base": ERROR_COLORS_IS_BLANK}
+    assert entry.data[CONF_COLOR_RGB_DICT] == {}
+
+
 async def test_options_scene_form_exposes_name_for_rename(hass: HomeAssistant) -> None:
     """Expose the scene name in options so users can submit renames."""
     flow, _ = _options_flow(hass)

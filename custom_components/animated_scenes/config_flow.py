@@ -178,6 +178,8 @@ def _normalize_rgb_ui_color_input(color_data: dict[str, Any]) -> str | None:
         The translation key for the validation error, or ``None`` when valid.
 
     """
+    if color_data.get(CONF_COLOR) is None:
+        return ERROR_COLORS_IS_BLANK
     _LOGGER.debug(
         "Checking Brightness: %s, type: %s",
         color_data.get(CONF_BRIGHTNESS),
@@ -344,11 +346,15 @@ def _build_color_rgb_ui_schema(
         user_input = {}
     default = partial(_schema_default, user_input, default_dict)
 
+    color_default = default(CONF_COLOR)
+    color_key = (
+        vol.Required(CONF_COLOR, default=color_default)
+        if color_default is not None
+        else vol.Required(CONF_COLOR)
+    )
     build_schema = vol.Schema(
         {
-            vol.Optional(CONF_COLOR, default=default(CONF_COLOR)): selector.ColorRGBSelector(
-                selector.ColorRGBSelectorConfig()
-            ),
+            color_key: selector.ColorRGBSelector(selector.ColorRGBSelectorConfig()),
             vol.Optional(
                 CONF_BRIGHTNESS,
                 default=list_or_int_to_str(default(CONF_BRIGHTNESS, DEFAULT_BRIGHTNESS)),

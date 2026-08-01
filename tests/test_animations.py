@@ -415,6 +415,63 @@ async def test_start_clamps_oversized_change_amount(hass: HomeAssistant) -> None
 
 
 @pytest.mark.asyncio
+async def test_startup_failure_rolls_back_runtime_state(hass: HomeAssistant) -> None:
+    """Roll back exact ownership and listener state when initial startup fails."""
+    manager = _runtime_manager(hass)
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+
+    with (
+        patch.object(Animation, "start", AsyncMock(side_effect=RuntimeError("startup failed"))),
+        pytest.raises(RuntimeError, match="startup failed"),
+    ):
+        await manager.start(_animation_config("Spooky", ["light.one"]))
+
+    assert manager.animations == {}
+    assert manager.light_owner == {}
+    assert manager._light_animations == {}
+    assert manager.states == {}
+    assert manager._external_light_listener is None
+
+
+@pytest.mark.asyncio
+async def test_update_skips_light_removed_after_tick_selection(hass: HomeAssistant) -> None:
+    """Tolerate ownership removal after a tick selects its lights."""
+    manager = _runtime_manager(hass)
+    for light in ("light.one", "light.two"):
+        hass.states.async_set(light, "on", {"brightness": 100, "color_mode": "rgb"})
+    animation = Animation(
+        hass,
+        manager.validate_start(_animation_config("Spooky", ["light.one", "light.two"])),
+    )
+    manager.animations[animation.name] = animation
+    for light in animation.lights:
+        manager._track_animation_light(animation, light)
+    selected_update_started = asyncio.Event()
+    continue_selected_update = asyncio.Event()
+    original_update_light = animation.update_light
+
+    async def pause_removed_light(entity_id: str, initial: bool = False) -> None:
+        """Pause the selected light until its ownership has been removed."""
+        if entity_id == "light.one":
+            selected_update_started.set()
+            await continue_selected_update.wait()
+        await original_update_light(entity_id, initial)
+
+    with (
+        patch.object(animation, "update_light", side_effect=pause_removed_light),
+        patch("custom_components.animated_scenes.animations.safe_call", AsyncMock()),
+    ):
+        update_task = asyncio.create_task(animation.update_lights())
+        await selected_update_started.wait()
+        await manager.remove_lights({CONF_LIGHTS: ["light.one"], CONF_SKIP_RESTORE: True})
+        continue_selected_update.set()
+        await update_task
+
+    assert manager.animations["Spooky"] is animation
+    assert animation.get_active_lights() == ["light.two"]
+
+
+@pytest.mark.asyncio
 async def test_concurrent_same_name_start_replaces_only_after_startup(
     hass: HomeAssistant,
 ) -> None:

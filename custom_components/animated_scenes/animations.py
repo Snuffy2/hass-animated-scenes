@@ -723,7 +723,10 @@ class Animation:
             None
 
         """
-        if Animations.instance and Animations.instance.get_animation_for_light(entity_id) != self:
+        if (
+            Animations.instance
+            and Animations.instance.get_animation_for_light(entity_id) is not self
+        ):
             _LOGGER.info(
                 "Skipping light %s due to conflicting animation with higher priority, %s",
                 entity_id,
@@ -891,9 +894,9 @@ class Animations:
                 return animation
         return None
 
-    def get_animation_for_light(self, entity_id: str) -> Animation:
-        """Return the animation that currently owns the given light."""
-        return self.light_owner[entity_id]
+    def get_animation_for_light(self, entity_id: str) -> Animation | None:
+        """Return the animation that currently owns a light, if any."""
+        return self.light_owner.get(entity_id)
 
     def refresh_animation_for_light(self, entity_id: str) -> Animation | None:
         """Pick the highest-priority animation that targets the given light."""
@@ -907,10 +910,8 @@ class Animations:
 
     def _track_animation_light(self, animation: Animation, light: str) -> None:
         """Track animation ownership and membership for a light."""
-        if (
-            light not in self.light_owner
-            or self.get_animation_for_light(light).priority <= animation.priority
-        ):
+        current_owner = self.get_animation_for_light(light)
+        if current_owner is None or current_owner.priority <= animation.priority:
             self.light_owner[light] = animation
         if light not in self._light_animations:
             self._light_animations[light] = []
@@ -935,7 +936,13 @@ class Animations:
         for light in animation.lights:
             self._track_animation_light(animation, light)
         self.animations[id_name] = animation
-        await animation.start()
+        startup_complete = False
+        try:
+            await animation.start()
+            startup_complete = True
+        finally:
+            if not startup_complete:
+                await animation.release()
 
     async def stop(self, data: dict[str, Any]) -> None:
         """Stop a running animation identified by service data."""
