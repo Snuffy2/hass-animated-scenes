@@ -17,6 +17,7 @@ from custom_components.animated_scenes.config_flow import (
     AnimatedScenesOptionsFlowHandler,
 )
 from custom_components.animated_scenes.const import (
+    ABORT_ACTIVITY_SENSOR_EXISTS,
     COLOR_SELECTOR_RGB_UI,
     COLOR_SELECTOR_YAML,
     CONF_COLOR,
@@ -33,6 +34,7 @@ from custom_components.animated_scenes.const import (
     DEFAULT_COLOR_NEARBY_COLORS,
     DEFAULT_COLOR_WEIGHT,
     DOMAIN,
+    ENTITY_ACTIVITY_SENSOR,
     ENTITY_SCENE,
     ERROR_BRIGHTNESS_NOT_INT_OR_RANGE,
     ERROR_COLORS_IS_BLANK,
@@ -106,6 +108,29 @@ def _existing_scene(hass: HomeAssistant, name: str, entry_id: str) -> MockConfig
     )
     entry.add_to_hass(hass)
     return entry
+
+
+async def test_stale_activity_sensor_menu_aborts_after_competing_creation(
+    hass: HomeAssistant,
+) -> None:
+    """Recheck activity-sensor uniqueness after a stale menu selection."""
+    flow = AnimatedScenesConfigFlow()
+    flow.hass = hass
+
+    menu = await flow.async_step_user()
+    competing_entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Activity Sensor",
+        data={CONF_ENTITY_TYPE: ENTITY_ACTIVITY_SENSOR},
+        entry_id="activity",
+    )
+    competing_entry.add_to_hass(hass)
+    result = await flow.async_step_activity_sensor()
+
+    assert menu["type"] == "menu"
+    assert result["type"] == "abort"
+    assert result["reason"] == ABORT_ACTIVITY_SENSOR_EXISTS
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
 
 
 async def test_scene_creation_rejects_duplicate_name(hass: HomeAssistant) -> None:

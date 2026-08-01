@@ -88,6 +88,9 @@
             "colors_malformed": "Colors: Invalid format",
             "must_select_lights": "You must select at least one light for the animation",
             "scene_name_exists": "An animated scene with this name already exists"
+        },
+        "abort": {
+            "activity_sensor_exists": "An Animated Scenes Activity Sensor already exists"
         }
     },
     "options": {

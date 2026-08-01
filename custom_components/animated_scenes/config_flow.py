@@ -20,6 +20,7 @@ import voluptuous as vol
 
 from .animations import Animations
 from .const import (
+    ABORT_ACTIVITY_SENSOR_EXISTS,
     ABORT_ACTIVITY_SENSOR_NO_OPTIONS,
     BRIGHTNESS_MAX,
     BRIGHTNESS_MIN,
@@ -443,6 +444,11 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_activity_sensor(self, _: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Create an activity sensor config entry immediately."""
+        if any(
+            entry.data.get(CONF_ENTITY_TYPE, ENTITY_SCENE) == ENTITY_ACTIVITY_SENSOR
+            for entry in self.hass.config_entries.async_entries(DOMAIN)
+        ):
+            return self.async_abort(reason=ABORT_ACTIVITY_SENSOR_EXISTS)
         self._data.update({CONF_NAME: "Activity Sensor", CONF_ENTITY_TYPE: ENTITY_ACTIVITY_SENSOR})
         return self.async_create_entry(title="Activity Sensor", data=self._data)
 

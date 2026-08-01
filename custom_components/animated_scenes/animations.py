@@ -136,10 +136,10 @@ def _rgb_to_kelvin(rgb: tuple[int, int, int]) -> int:
     """Approximate the kelvin color temperature for an RGB triple.
 
     This finds the kelvin in [MIN_KELVIN, MAX_KELVIN] whose color_temperature_to_rgb
-    result is closest (Euclidean) to the provided RGB. It's not perfect
-    but is sufficient for nearby-color perturbations.
+    result is closest (Euclidean) to the provided 0..255 RGB channels. It's
+    not perfect but is sufficient for nearby-color perturbations.
     """
-    target = tuple(float(c) / 255.0 for c in rgb)
+    target = tuple(float(c) for c in rgb)
 
     lo = MIN_KELVIN
     hi = MAX_KELVIN
@@ -399,7 +399,7 @@ class Animation:
         - ATTR_RGBWW_COLOR: expects (r, g, b, cw, ww); converted via
           `color_rgbww_to_rgb` using `MIN_KELVIN`/`MAX_KELVIN` bounds.
         - ATTR_COLOR_TEMP_KELVIN: expects an integer kelvin; converted via
-          `color_temperature_to_rgb` and scaled from 0..1 to 0..255.
+          `color_temperature_to_rgb`, which returns 0..255 channels.
         - ATTR_HS_COLOR: expects (h, s) and converted via `color_hs_to_RGB`.
         - ATTR_XY_COLOR: expects (x, y) and converted via `color_xy_to_RGB`.
 
@@ -440,9 +440,9 @@ class Animation:
                 # Convert color temperature (kelvin) to an RGB triple
                 r_f, g_f, b_f = color_temperature_to_rgb(float(kelvin))
                 return (
-                    int(min(max(r_f * 255.0, 0), 255)),
-                    int(min(max(g_f * 255.0, 0), 255)),
-                    int(min(max(b_f * 255.0, 0), 255)),
+                    int(min(max(r_f, 0), 255)),
+                    int(min(max(g_f, 0), 255)),
+                    int(min(max(b_f, 0), 255)),
                 )
             except TypeError, ValueError:
                 return None

@@ -8,6 +8,7 @@ from types import MappingProxyType, SimpleNamespace
 from typing import cast
 from unittest.mock import AsyncMock, patch
 
+from homeassistant.components.light import ATTR_COLOR_TEMP_KELVIN
 from homeassistant.config_entries import ConfigEntry, DiscoveryKey
 from homeassistant.const import CONF_NAME, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -28,6 +29,8 @@ from custom_components.animated_scenes.animations import (
     safe_call,
 )
 from custom_components.animated_scenes.const import (
+    CONF_COLOR,
+    CONF_COLOR_TYPE,
     CONF_ENTITY_TYPE,
     CONF_LIGHTS,
     CONF_SKIP_RESTORE,
@@ -36,6 +39,7 @@ from custom_components.animated_scenes.const import (
     ENTITY_SCENE,
     EVENT_NAME_CHANGE,
     EVENT_STATE_UPDATED,
+    MIN_KELVIN,
 )
 from custom_components.animated_scenes.scene_config import (
     ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA,
@@ -133,6 +137,37 @@ def test_rgb_to_kelvin_caches_repeated_lookup() -> None:
     _rgb_to_kelvin((255, 128, 64))
 
     assert _rgb_to_kelvin.cache_info().hits == 1
+
+
+@pytest.mark.parametrize("kelvin", [2200, 4000, 6200])
+def test_kelvin_rgb_round_trip_stays_near_source(kelvin: int) -> None:
+    """Keep warm, neutral, and cool conversions near their source temperature."""
+    animation = cast("Animation", object.__new__(Animation))
+
+    rgb = animation._convert_to_rgb({CONF_COLOR_TYPE: ATTR_COLOR_TEMP_KELVIN, CONF_COLOR: kelvin})
+
+    assert rgb is not None
+    # Integer RGB channels lose temperature precision, especially at the cool
+    # end where adjacent kelvin values map to the same bytes.
+    assert abs(_rgb_to_kelvin(rgb) - kelvin) <= 500
+
+
+def test_kelvin_rgb_round_trips_do_not_collapse_to_minimum() -> None:
+    """Produce distinct inferred temperatures instead of always returning the minimum."""
+    animation = cast("Animation", object.__new__(Animation))
+    inferred = {
+        _rgb_to_kelvin(rgb)
+        for kelvin in (2200, 4000, 6200)
+        if (
+            rgb := animation._convert_to_rgb(
+                {CONF_COLOR_TYPE: ATTR_COLOR_TEMP_KELVIN, CONF_COLOR: kelvin}
+            )
+        )
+        is not None
+    }
+
+    assert len(inferred) == 3
+    assert inferred != {MIN_KELVIN}
 
 
 @pytest.mark.asyncio
