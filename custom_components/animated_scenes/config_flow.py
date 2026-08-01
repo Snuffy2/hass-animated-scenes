@@ -535,6 +535,8 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
             self._data.update(user_input)
             if error := _validate_color_yaml_data(self._data):
                 errors["base"] = error
+            if not errors and _scene_name_exists(self.hass, self._data[CONF_NAME]):
+                errors["base"] = ERROR_SCENE_NAME_EXISTS
             if not errors:
                 return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
         return self.async_show_form(
@@ -569,6 +571,8 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
                 if error := _validate_rgb_ui_runtime_data(self._data):
                     errors["base"] = error
+                elif _scene_name_exists(self.hass, self._data[CONF_NAME]):
+                    errors["base"] = ERROR_SCENE_NAME_EXISTS
                 else:
                     return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
 
@@ -686,6 +690,10 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
             self._data.update(user_input)
             if error := _validate_color_yaml_data(self._data):
                 errors["base"] = error
+            if not errors and _scene_name_exists(
+                self.hass, self._data[CONF_NAME], self.config.entry_id
+            ):
+                errors["base"] = ERROR_SCENE_NAME_EXISTS
             if not errors:
                 self._data.update({CONF_COLOR_RGB_DICT: {}})
                 await self._async_stop_previous_animation_if_renamed()
@@ -756,6 +764,19 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                 self._data.update({CONF_COLOR_RGB_DICT: cleaned_color_rgb_dict})
                 if error := _validate_rgb_ui_runtime_data(self._data):
                     errors["base"] = error
+                    return self.async_show_form(
+                        step_id="color_rgb_ui",
+                        data_schema=_build_color_rgb_ui_schema(
+                            user_input,
+                            color_data,
+                            options_flow=True,
+                            is_last_color=True,
+                        ),
+                        errors=errors,
+                        description_placeholders={"scene_name": self._data[CONF_NAME]},
+                    )
+                if _scene_name_exists(self.hass, self._data[CONF_NAME], self.config.entry_id):
+                    errors["base"] = ERROR_SCENE_NAME_EXISTS
                     return self.async_show_form(
                         step_id="color_rgb_ui",
                         data_schema=_build_color_rgb_ui_schema(

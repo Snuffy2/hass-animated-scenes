@@ -159,6 +159,46 @@ async def test_scene_import_rejects_duplicate_name(hass: HomeAssistant) -> None:
     assert result["errors"] == {"base": ERROR_SCENE_NAME_EXISTS}
 
 
+async def test_yaml_creation_rechecks_duplicate_name_before_create(
+    hass: HomeAssistant,
+) -> None:
+    """Reject a competing scene created after the YAML scene step."""
+    flow = AnimatedScenesConfigFlow()
+    flow.hass = hass
+    scene_result = await flow.async_step_scene(_scene_input("Spooky"))
+    _existing_scene(hass, "Spooky", "competing")
+
+    result = await flow.async_step_color_yaml(
+        {CONF_COLORS: [{"color_type": "rgb_color", "color": [255, 0, 0]}]}
+    )
+
+    assert scene_result["step_id"] == "color_yaml"
+    assert result["type"] == "form"
+    assert result["step_id"] == "color_yaml"
+    assert result["errors"] == {"base": ERROR_SCENE_NAME_EXISTS}
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+
+
+async def test_rgb_creation_rechecks_duplicate_name_before_create(
+    hass: HomeAssistant,
+) -> None:
+    """Reject a competing scene created after the RGB scene step."""
+    flow = AnimatedScenesConfigFlow()
+    flow.hass = hass
+    scene_input = _scene_input("Spooky")
+    scene_input[CONF_COLOR_SELECTOR_MODE] = COLOR_SELECTOR_RGB_UI
+    scene_result = await flow.async_step_scene(scene_input)
+    _existing_scene(hass, "Spooky", "competing")
+
+    result = await flow.async_step_color_rgb_ui({CONF_COLOR: [255, 0, 0]})
+
+    assert scene_result["step_id"] == "color_rgb_ui"
+    assert result["type"] == "form"
+    assert result["step_id"] == "color_rgb_ui"
+    assert result["errors"] == {"base": ERROR_SCENE_NAME_EXISTS}
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+
+
 async def test_options_rename_rejects_duplicate_name(hass: HomeAssistant) -> None:
     """Reject renaming a scene to another entry's runtime name."""
     flow, entry = _options_flow(hass)
@@ -169,6 +209,31 @@ async def test_options_rename_rejects_duplicate_name(hass: HomeAssistant) -> Non
     assert result["type"] == "form"
     assert result["step_id"] == "scene"
     assert result["errors"] == {"base": ERROR_SCENE_NAME_EXISTS}
+    assert entry.data[CONF_NAME] == "Spooky"
+
+
+async def test_options_rename_rechecks_duplicate_name_before_update(
+    hass: HomeAssistant,
+) -> None:
+    """Reject a competing scene created after the options scene step."""
+    flow, entry = _options_flow(hass)
+    scene_result = await flow.async_step_scene({CONF_NAME: "Scary"})
+    _existing_scene(hass, "Scary", "competing")
+
+    with (
+        patch.object(hass.config_entries, "async_update_entry") as update_entry,
+        patch.object(hass.config_entries, "async_reload", AsyncMock()) as reload_entry,
+    ):
+        result = await flow.async_step_color_yaml(
+            {CONF_COLORS: [{"color_type": "rgb_color", "color": [255, 0, 0]}]}
+        )
+
+    assert scene_result["step_id"] == "color_yaml"
+    assert result["type"] == "form"
+    assert result["step_id"] == "color_yaml"
+    assert result["errors"] == {"base": ERROR_SCENE_NAME_EXISTS}
+    update_entry.assert_not_called()
+    reload_entry.assert_not_awaited()
     assert entry.data[CONF_NAME] == "Spooky"
 
 

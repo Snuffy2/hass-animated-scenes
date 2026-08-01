@@ -10,7 +10,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github/workflows/release.yml"
-WORKFLOW_SCRIPT_PATH = ".github/scripts/update_release_version.py"
+WORKFLOW_SCRIPT_PATH = "release-tooling/.github/scripts/update_release_version.py"
 
 
 def _workflow_text() -> str:
@@ -60,6 +60,7 @@ def test_published_release_checkout_uses_release_tag() -> None:
 
     assert "github.event.release.tag_name" in checkout_block
     assert "github.event.release.target_commitish" not in checkout_block
+    assert "path: release-payload" in checkout_block
 
 
 @pytest.mark.parametrize(
@@ -82,12 +83,24 @@ def test_release_shell_steps_use_tag_environment_variable(step_name: str) -> Non
 
 
 def test_release_workflow_runs_checked_in_version_update_script() -> None:
-    """Release workflow delegates version-file edits to the checked-in script."""
+    """Release workflow runs trusted tooling against the tagged payload."""
     workflow = _workflow_text()
+    tooling_checkout = _step_block(workflow, "Checkout trusted release tooling")
     step_block = _step_block(workflow, "Update Release Version Files")
 
+    assert "ref: ${{ github.workflow_sha }}" in tooling_checkout
+    assert "path: release-tooling" in tooling_checkout
+    assert "persist-credentials: false" in tooling_checkout
+    assert "sparse-checkout: .github/scripts/update_release_version.py" in tooling_checkout
+    assert "sparse-checkout-cone-mode: false" in tooling_checkout
     assert f"python {WORKFLOW_SCRIPT_PATH}" in step_block
     assert '--tag-name "$TAG_NAME"' in step_block
+    assert (
+        "--manifest-path release-payload/custom_components/animated_scenes/manifest.json"
+        in step_block
+    )
+    assert "--const-path release-payload/custom_components/animated_scenes/const.py" in step_block
+    assert "python .github/scripts/update_release_version.py" not in workflow
     assert "python - <<'PY'" not in workflow
 
 

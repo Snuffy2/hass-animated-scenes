@@ -15,24 +15,38 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout trusted release tooling
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: release-tooling
+          persist-credentials: false
+          sparse-checkout: .github/scripts/update_release_version.py
+          sparse-checkout-cone-mode: false
+
       - name: Checkout Repository
         uses: actions/checkout@v6
         with:
           # Release events must package the release tag instead of a moving
           # target_commitish branch.
           ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+          path: release-payload
 
       - name: Update Release Version Files
         if: ${{ github.event_name == 'release' && github.event.release.draft == false }}
         env:
           TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
-          python .github/scripts/update_release_version.py --tag-name "$TAG_NAME"
+          python release-tooling/.github/scripts/update_release_version.py \
+            --tag-name "$TAG_NAME" \
+            --manifest-path release-payload/custom_components/animated_scenes/manifest.json \
+            --const-path release-payload/custom_components/animated_scenes/const.py
 
       - name: Commit & Push Version Changes
         if: ${{ github.event_name == 'release' && github.event.action == 'published' && github.event.release.draft == false && github.event.release.prerelease == false  }}
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
+          repository: release-payload
           branch: ${{ github.event.release.target_commitish }}
           commit_message: 'Updating to version ${{ github.event.release.tag_name }} [skip ci]'
 
@@ -40,20 +54,21 @@ jobs:
         if: ${{ github.event_name == 'release' && github.event.action == 'published' && github.event.release.draft == false && github.event.release.prerelease == false  }}
         env:
           TAG_NAME: ${{ github.event.release.tag_name }}
+        working-directory: release-payload
         run: |
           git tag -f "$TAG_NAME"
           git push -f origin "$TAG_NAME"
 
       - name: Create Zip
         run: |
-          cd ${{ github.workspace }}/custom_components/animated_scenes
+          cd ${{ github.workspace }}/release-payload/custom_components/animated_scenes
           zip animated_scenes.zip -r ./
 
       - name: Upload Zip to Release
         if: ${{ github.event_name == 'release' && github.event.release.draft == false }}
         uses: softprops/action-gh-release@v3
         with:
-          files: ./custom_components/animated_scenes/animated_scenes.zip
+          files: ./release-payload/custom_components/animated_scenes/animated_scenes.zip
           tag_name: ${{ github.event.release.tag_name }}
 
       - name: Add Zip to Action
@@ -61,5 +76,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: animated_scenes
-          path: ./custom_components/animated_scenes/animated_scenes.zip
+          path: ./release-payload/custom_components/animated_scenes/animated_scenes.zip
           if-no-files-found: error
