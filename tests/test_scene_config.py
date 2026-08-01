@@ -131,7 +131,7 @@ def test_normalize_scene_input_accepts_fractional_runtime_timings() -> None:
         ("transition", "[1, bad]", "transition_not_int_or_range"),
         (CONF_BRIGHTNESS, "300", "brightness_not_int_or_range"),
         (CONF_LIGHTS, None, "must_select_lights"),
-        (CONF_PRIORITY, "high", "priority must be a number"),
+        (CONF_PRIORITY, "high", "priority_not_int"),
     ],
 )
 def test_normalize_scene_input_reports_specific_errors(
@@ -269,8 +269,9 @@ def test_validate_start_service_data_rejects_fractional_brightness(
     data = normalize_scene_input(_base_input())
     data[CONF_BRIGHTNESS] = brightness
 
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(vol.Invalid) as err:
         validate_start_service_data(data)
+    assert "priority_not_int" not in str(err.value)
 
 
 @pytest.mark.parametrize(
@@ -284,8 +285,9 @@ def test_validate_start_service_data_rejects_fractional_change_amount(
     data = normalize_scene_input(_base_input())
     data[CONF_CHANGE_AMOUNT] = change_amount
 
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(vol.Invalid) as err:
         validate_start_service_data(data)
+    assert "priority_not_int" not in str(err.value)
 
 
 @pytest.mark.parametrize(
@@ -317,13 +319,13 @@ def test_validate_start_service_data_accepts_integral_priority(
     assert result[CONF_PRIORITY] == expected
 
 
-@pytest.mark.parametrize(CONF_PRIORITY, [1.5, "1.5", -2.5])
-def test_validate_start_service_data_rejects_fractional_priority(priority: object) -> None:
-    """Reject fractional priorities at the runtime service boundary."""
+@pytest.mark.parametrize(CONF_PRIORITY, ["high", 1.5, "1.5", -2.5])
+def test_validate_start_service_data_rejects_invalid_priority(priority: object) -> None:
+    """Reject nonnumeric and fractional priorities at the service boundary."""
     data = normalize_scene_input(_base_input())
     data[CONF_PRIORITY] = priority
 
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(vol.Invalid, match="priority_not_int"):
         validate_start_service_data(data)
 
 
@@ -344,7 +346,7 @@ def test_normalize_scene_input_rejects_fractional_priority(priority: object) -> 
     data = _base_input()
     data[CONF_PRIORITY] = priority
 
-    with pytest.raises(vol.Invalid, match="priority must be a number"):
+    with pytest.raises(vol.Invalid, match="priority_not_int"):
         normalize_scene_input(data)
 
 

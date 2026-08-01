@@ -42,16 +42,36 @@ jobs:
             --manifest-path release-payload/custom_components/animated_scenes/manifest.json \
             --const-path release-payload/custom_components/animated_scenes/const.py
 
+      - name: Resolve Release Target Branch
+        id: release-target
+        if: ${{ github.event_name == 'release' && github.event.action == 'published' && github.event.release.draft == false && github.event.release.prerelease == false }}
+        env:
+          TARGET_COMMITISH: ${{ github.event.release.target_commitish }}
+        working-directory: release-payload
+        run: |
+          set -euo pipefail
+          if git check-ref-format --branch "$TARGET_COMMITISH" >/dev/null 2>&1; then
+            if git ls-remote --exit-code --heads origin \
+              "refs/heads/$TARGET_COMMITISH" >/dev/null; then
+              printf 'is_branch=true\nbranch=%s\n' "$TARGET_COMMITISH" >> "$GITHUB_OUTPUT"
+              exit 0
+            elif [[ $? -ne 2 ]]; then
+              echo "Unable to resolve the release target against remote branches" >&2
+              exit 1
+            fi
+          fi
+          printf 'is_branch=false\n' >> "$GITHUB_OUTPUT"
+
       - name: Commit & Push Version Changes
-        if: ${{ github.event_name == 'release' && github.event.action == 'published' && github.event.release.draft == false && github.event.release.prerelease == false  }}
+        if: ${{ github.event_name == 'release' && github.event.action == 'published' && github.event.release.draft == false && github.event.release.prerelease == false && steps.release-target.outputs.is_branch == 'true' }}
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           repository: release-payload
-          branch: ${{ github.event.release.target_commitish }}
+          branch: ${{ steps.release-target.outputs.branch }}
           commit_message: 'Updating to version ${{ github.event.release.tag_name }} [skip ci]'
 
       - name: Update Release with Version Changes Commit
-        if: ${{ github.event_name == 'release' && github.event.action == 'published' && github.event.release.draft == false && github.event.release.prerelease == false  }}
+        if: ${{ github.event_name == 'release' && github.event.action == 'published' && github.event.release.draft == false && github.event.release.prerelease == false && steps.release-target.outputs.is_branch == 'true' }}
         env:
           TAG_NAME: ${{ github.event.release.tag_name }}
         working-directory: release-payload

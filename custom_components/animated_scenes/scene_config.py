@@ -66,6 +66,7 @@ from .const import (
     ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE,
     ERROR_COLORS_MALFORMED,
     ERROR_MUST_SELECT_LIGHTS,
+    ERROR_PRIORITY_NOT_INT,
     ERROR_TRANSITION_NOT_INT_OR_RANGE,
     TRANSITION_MAX,
     TRANSITION_MIN,
@@ -120,6 +121,25 @@ def _whole_float_to_int(value: float) -> int:
     return int(value)
 
 
+def _priority_to_int(value: Any) -> int:
+    """Convert an integral priority value to int with its flow error key.
+
+    Args:
+        value: Priority value supplied through a flow or service call.
+
+    Returns:
+        Integer representation of the priority.
+
+    Raises:
+        vol.Invalid: If the value is not numeric or has a fractional component.
+
+    """
+    try:
+        return _whole_float_to_int(float(value))
+    except (TypeError, ValueError, vol.Invalid) as err:
+        raise vol.Invalid(ERROR_PRIORITY_NOT_INT) from err
+
+
 BRIGHTNESS_VALUE_SCHEMA = vol.All(
     vol.Coerce(float),
     _whole_float_to_int,
@@ -147,7 +167,7 @@ CHANGE_AMOUNT_VALUE_SCHEMA = vol.All(
     _whole_float_to_int,
     vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX),
 )
-PRIORITY_VALUE_SCHEMA = vol.All(vol.Coerce(float), _whole_float_to_int)
+PRIORITY_VALUE_SCHEMA = _priority_to_int
 BRIGHTNESS_RANGE_SCHEMA = vol.Any(
     BRIGHTNESS_VALUE_SCHEMA,
     vol.ExactSequence(
@@ -518,7 +538,7 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
             normalized.get(CONF_PRIORITY, DEFAULT_PRIORITY)
         )
     except vol.Invalid as err:
-        raise vol.Invalid("priority must be a number") from err
+        raise vol.Invalid(ERROR_PRIORITY_NOT_INT) from err
     return normalized
 
 

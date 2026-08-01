@@ -63,6 +63,42 @@ def test_published_release_checkout_uses_release_tag() -> None:
     assert "path: release-payload" in checkout_block
 
 
+def test_release_target_branch_is_resolved_as_an_exact_remote_head() -> None:
+    """A branch target enables commit and retag steps only after validation."""
+    workflow = _workflow_text()
+    resolve_block = _step_block(workflow, "Resolve Release Target Branch")
+    commit_block = _step_block(workflow, "Commit & Push Version Changes")
+    retag_block = _step_block(workflow, "Update Release with Version Changes Commit")
+
+    assert "TARGET_COMMITISH: ${{ github.event.release.target_commitish }}" in resolve_block
+    assert 'git check-ref-format --branch "$TARGET_COMMITISH"' in resolve_block
+    assert '"refs/heads/$TARGET_COMMITISH"' in resolve_block
+    assert "git ls-remote --exit-code --heads origin" in resolve_block
+    assert "printf 'is_branch=true\\nbranch=%s\\n' \"$TARGET_COMMITISH\"" in resolve_block
+    assert "elif [[ $? -ne 2 ]]" in resolve_block
+    assert "Unable to resolve the release target against remote branches" in resolve_block
+    assert "branch: ${{ steps.release-target.outputs.branch }}" in commit_block
+    assert "steps.release-target.outputs.is_branch == 'true'" in commit_block
+    assert "steps.release-target.outputs.is_branch == 'true'" in retag_block
+
+
+def test_non_branch_release_target_skips_remote_mutations() -> None:
+    """A SHA or other non-branch target is packaged without moving remote refs."""
+    workflow = _workflow_text()
+    resolve_block = _step_block(workflow, "Resolve Release Target Branch")
+    commit_block = _step_block(workflow, "Commit & Push Version Changes")
+    retag_block = _step_block(workflow, "Update Release with Version Changes Commit")
+    zip_block = _step_block(workflow, "Create Zip")
+    upload_block = _step_block(workflow, "Upload Zip to Release")
+
+    assert "printf 'is_branch=false\\n' >> \"$GITHUB_OUTPUT\"" in resolve_block
+    assert "github.event.release.target_commitish" not in commit_block
+    assert "steps.release-target.outputs.is_branch == 'true'" in commit_block
+    assert "steps.release-target.outputs.is_branch == 'true'" in retag_block
+    assert "steps.release-target.outputs.is_branch" not in zip_block
+    assert "steps.release-target.outputs.is_branch" not in upload_block
+
+
 @pytest.mark.parametrize(
     "step_name",
     [
