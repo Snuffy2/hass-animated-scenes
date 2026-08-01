@@ -101,7 +101,7 @@ def _strlist_to_list(value: str) -> list[str]:
     return [item.strip() for item in value.strip("][").split(",")]
 
 
-def _float_to_int(value: float) -> int:
+def _whole_float_to_int(value: float) -> int:
     """Convert a whole float to int or raise for fractional values.
 
     Args:
@@ -115,13 +115,13 @@ def _float_to_int(value: float) -> int:
 
     """
     if not value.is_integer():
-        raise vol.Invalid("brightness must be an int")
+        raise vol.Invalid("value must be a whole number")
     return int(value)
 
 
 BRIGHTNESS_VALUE_SCHEMA = vol.All(
     vol.Coerce(float),
-    _float_to_int,
+    _whole_float_to_int,
     vol.Range(min=BRIGHTNESS_MIN, max=BRIGHTNESS_MAX),
 )
 TRANSITION_VALUE_SCHEMA = vol.All(
@@ -142,7 +142,9 @@ CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA = vol.All(
     ),
 )
 CHANGE_AMOUNT_VALUE_SCHEMA = vol.All(
-    vol.Coerce(int), vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX)
+    vol.Coerce(float),
+    _whole_float_to_int,
+    vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX),
 )
 BRIGHTNESS_RANGE_SCHEMA = vol.Any(
     BRIGHTNESS_VALUE_SCHEMA,

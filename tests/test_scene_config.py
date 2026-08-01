@@ -223,6 +223,37 @@ def test_validate_start_service_data_rejects_fractional_brightness(
 
 
 @pytest.mark.parametrize(
+    CONF_CHANGE_AMOUNT,
+    [0.5, "0.5", (1, 2.5), ("1", "2.5")],
+)
+def test_validate_start_service_data_rejects_fractional_change_amount(
+    change_amount: object,
+) -> None:
+    """Reject fractional scalar and range change amounts without truncation."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_CHANGE_AMOUNT] = change_amount
+
+    with pytest.raises(vol.Invalid):
+        validate_start_service_data(data)
+
+
+@pytest.mark.parametrize(
+    (CONF_CHANGE_AMOUNT, "expected"),
+    [(2.0, 2), ("2.0", 2), ((1.0, "2.0"), (1, 2))],
+)
+def test_validate_start_service_data_accepts_integral_change_amount(
+    change_amount: object, expected: int | list[int]
+) -> None:
+    """Convert integral float and string change amounts to runtime integers."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_CHANGE_AMOUNT] = change_amount
+
+    result = validate_start_service_data(data)
+
+    assert result[CONF_CHANGE_AMOUNT] == expected
+
+
+@pytest.mark.parametrize(
     CONF_CHANGE_FREQUENCY,
     [
         -1,
