@@ -275,6 +275,26 @@ async def test_release_light_hands_owner_to_next_priority(hass: HomeAssistant) -
 
 
 @pytest.mark.asyncio
+async def test_release_light_hands_off_extreme_negative_priority(
+    hass: HomeAssistant,
+) -> None:
+    """Hand ownership to priorities below the former finite sentinel."""
+    manager = _runtime_manager(hass)
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+    low = Animation(hass, _animation_config("Low", ["light.one"], priority=-(2**40)))
+    high = Animation(hass, _animation_config("High", ["light.one"], priority=-(2**39)))
+    manager.animations = {low.name: low, high.name: high}
+    manager.light_owner["light.one"] = high
+    manager._light_animations["light.one"] = [low, high]
+    manager.store_state("light.one")
+
+    await manager.release_light(high, "light.one")
+
+    assert manager.light_owner["light.one"] is low
+    assert "light.one" in manager.states
+
+
+@pytest.mark.asyncio
 async def test_release_light_skip_ownership_removes_owner(
     hass: HomeAssistant,
 ) -> None:
@@ -480,6 +500,28 @@ async def test_start_clamps_oversized_change_amount(hass: HomeAssistant) -> None
 
     assert manager.animations["Spooky"].get_change_amount() == 1
     await manager.stop({"name": "Spooky"})
+
+
+@pytest.mark.parametrize(("restore", "expected_calls"), [(True, 2), (False, 1)])
+@pytest.mark.asyncio
+async def test_one_shot_release_honors_restore_setting(
+    hass: HomeAssistant, restore: bool, expected_calls: int
+) -> None:
+    """Apply one initial update and restore only when configured to do so."""
+    manager = _runtime_manager(hass)
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+    config = _animation_config("One Shot", ["light.one"])
+    config["change_frequency"] = 0
+    config["restore"] = restore
+
+    with patch("custom_components.animated_scenes.animations.safe_call", AsyncMock()) as safe_call:
+        await manager.start(config)
+
+    assert safe_call.await_count == expected_calls
+    assert safe_call.await_args_list[0].args[3]["entity_id"] == "light.one"
+    if restore:
+        assert safe_call.await_args_list[-1].args[3]["brightness"] == 100
+    assert manager.animations == {}
 
 
 @pytest.mark.asyncio

@@ -901,11 +901,11 @@ class Animations:
     def refresh_animation_for_light(self, entity_id: str) -> Animation | None:
         """Pick the highest-priority animation that targets the given light."""
         selected: Animation | None = None
-        selected_priority: int = -(2**31)
         for animation in self._light_animations[entity_id]:
-            if entity_id in animation.lights and animation.priority > selected_priority:
+            if entity_id in animation.lights and (
+                selected is None or animation.priority > selected.priority
+            ):
                 selected = animation
-                selected_priority = animation.priority
         return selected
 
     def _track_animation_light(self, animation: Animation, light: str) -> None:

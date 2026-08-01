@@ -59,7 +59,7 @@ To edit a scene later, open the scene entry from **Settings > Devices & Services
 | `name` | The scene name. This is also the animation name used by services. |
 | `priority` | Higher-priority animations win when multiple animations want the same light. |
 | `transition` | How long each light transition takes, in seconds. |
-| `change_frequency` | How often the animation changes lights, in seconds. Must be greater than `0`. |
+| `change_frequency` | How often the animation changes lights, from `0` to `3600` seconds. Use scalar `0` for one initial update followed by immediate release. |
 | `change_amount` | How many lights change each tick. Use a number, a range like `[1, 3]`, or `all`. |
 | `ignore_off` | When enabled, the animation ignores the current off state and includes those lights. When disabled, lights that are off are skipped. |
 | `restore` | Restore previous light state when the animation ends. |
@@ -69,6 +69,8 @@ To edit a scene later, open the scene entry from **Settings > Devices & Services
 | `animate_brightness` | Continue changing brightness while the animation runs. |
 | `animate_color` | Continue changing colors while the animation runs. |
 | `lights` | The lights included in the animation. |
+
+A scalar `change_frequency: 0` creates a one-shot scene: it performs the initial light update and then releases the animation. Normal release settings still apply. With `restore: true`, prior light attributes are restored; `restore_power` controls whether lights that were originally off are turned back off. Set `restore: false` when the one-shot change should persist.
 
 ## Color Configuration
 
@@ -262,7 +264,7 @@ Animated Scenes validates UI configuration and service calls before starting an 
 | Field | Allowed values |
 | --- | --- |
 | `transition` | `0` to `6553` seconds, or a two-item range like `[0.5, 2]`. |
-| `change_frequency` | Greater than `0` and up to `3600` seconds, or a two-item range like `[0.25, 1.5]`. Each range bound must be greater than `0`. |
+| `change_frequency` | `0` to `3600` seconds, or a two-item range like `[0, 1.5]`. Scalar `0` performs one initial update and immediately releases the animation. |
 | `change_amount` | An integer, a two-item range like `[1, 3]`, or `all`. |
 | `brightness` | `0` to `255`, or a two-item range like `[70, 255]`. |
 | `colors` | At least one color is required. |
