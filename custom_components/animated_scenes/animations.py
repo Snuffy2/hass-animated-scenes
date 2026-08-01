@@ -1077,6 +1077,7 @@ class Animations:
                     animation.name,
                     light_owner.name,
                 )
+                await light_owner.update_light(entity_id)
                 return
         if animation.restore and not skip_restore and entity_id in self.states:
             previous_state = self.states[entity_id]

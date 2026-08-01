@@ -198,6 +198,25 @@ async def test_new_rgb_ui_rejects_missing_color(hass: HomeAssistant) -> None:
     assert result["errors"] == {"base": ERROR_COLORS_IS_BLANK}
 
 
+async def test_new_rgb_ui_rejects_all_zero_color_weights(hass: HomeAssistant) -> None:
+    """Reject a completed new RGB scene with no selectable color weight."""
+    flow = AnimatedScenesConfigFlow()
+    flow.hass = hass
+    await flow.async_step_scene(
+        {
+            CONF_NAME: "Zero Weight",
+            CONF_LIGHTS: ["light.one"],
+            CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_RGB_UI,
+        }
+    )
+
+    result = await flow.async_step_color_rgb_ui({CONF_COLOR: [255, 0, 0], CONF_COLOR_WEIGHT: 0})
+
+    assert result["type"] == "form"
+    assert result["errors"] == {"base": ERROR_COLORS_MALFORMED}
+    assert hass.config_entries.async_entries(DOMAIN) == []
+
+
 async def test_options_rgb_ui_rejects_missing_color(hass: HomeAssistant) -> None:
     """Reject an options RGB UI submission whose color is missing."""
     flow, entry = _options_flow(hass, selector_mode=COLOR_SELECTOR_RGB_UI)
@@ -206,6 +225,23 @@ async def test_options_rgb_ui_rejects_missing_color(hass: HomeAssistant) -> None
 
     assert result["type"] == "form"
     assert result["errors"] == {"base": ERROR_COLORS_IS_BLANK}
+    assert entry.data[CONF_COLOR_RGB_DICT] == {}
+
+
+async def test_options_rgb_ui_rejects_all_zero_color_weights(hass: HomeAssistant) -> None:
+    """Reject zero-total RGB options without updating or reloading the entry."""
+    flow, entry = _options_flow(hass, selector_mode=COLOR_SELECTOR_RGB_UI)
+
+    with (
+        patch.object(hass.config_entries, "async_update_entry") as update_entry,
+        patch.object(hass.config_entries, "async_reload", AsyncMock()) as reload_entry,
+    ):
+        result = await flow.async_step_color_rgb_ui({CONF_COLOR: [255, 0, 0], CONF_COLOR_WEIGHT: 0})
+
+    assert result["type"] == "form"
+    assert result["errors"] == {"base": ERROR_COLORS_MALFORMED}
+    update_entry.assert_not_called()
+    reload_entry.assert_not_awaited()
     assert entry.data[CONF_COLOR_RGB_DICT] == {}
 
 

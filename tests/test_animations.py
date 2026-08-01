@@ -260,7 +260,9 @@ async def test_release_light_hands_owner_to_next_priority(hass: HomeAssistant) -
     """
     manager = _runtime_manager(hass)
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
-    low = Animation(hass, _animation_config("Low", ["light.one"], priority=1))
+    low_config = _animation_config("Low", ["light.one"], priority=1)
+    low_config["change_frequency"] = 3600
+    low = Animation(hass, low_config)
     high = Animation(hass, _animation_config("High", ["light.one"], priority=10))
     manager.animations[low.name] = low
     manager.animations[high.name] = high
@@ -268,10 +270,12 @@ async def test_release_light_hands_owner_to_next_priority(hass: HomeAssistant) -
     manager._light_animations["light.one"] = [low, high]
     manager.store_state("light.one")
 
-    await manager.release_light(high, "light.one")
+    with patch.object(low, "update_light", AsyncMock()) as update_light:
+        await manager.release_light(high, "light.one")
 
     assert manager.light_owner["light.one"] is low
     assert "light.one" in manager.states
+    update_light.assert_awaited_once_with("light.one")
 
 
 @pytest.mark.asyncio
@@ -281,8 +285,14 @@ async def test_release_light_hands_off_extreme_negative_priority(
     """Hand ownership to priorities below the former finite sentinel."""
     manager = _runtime_manager(hass)
     hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
-    low = Animation(hass, _animation_config("Low", ["light.one"], priority=-(2**40)))
-    high = Animation(hass, _animation_config("High", ["light.one"], priority=-(2**39)))
+    low = Animation(
+        hass,
+        manager.validate_start(_animation_config("Low", ["light.one"], priority=-(2**40))),
+    )
+    high = Animation(
+        hass,
+        manager.validate_start(_animation_config("High", ["light.one"], priority=-(2**39))),
+    )
     manager.animations = {low.name: low, high.name: high}
     manager.light_owner["light.one"] = high
     manager._light_animations["light.one"] = [low, high]

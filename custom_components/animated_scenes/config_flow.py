@@ -75,6 +75,7 @@ from .const import (
 )
 from .scene_config import (
     SCENE_DEFAULTS,
+    build_colors_from_rgb_dict,
     clean_color_rgb_dict,
     is_int_or_list,
     list_or_int_to_str,
@@ -154,6 +155,28 @@ def _validate_color_yaml_data(data: dict[str, Any]) -> str | None:
         _validate_yaml_runtime_data(data)
     except vol.Invalid as err:
         _LOGGER.debug("Invalid YAML color payload: %s", err)
+        return ERROR_COLORS_MALFORMED
+    return None
+
+
+def _validate_rgb_ui_runtime_data(data: dict[str, Any]) -> str | None:
+    """Validate a completed RGB UI color dictionary through the runtime schema.
+
+    Args:
+        data: Completed scene configuration containing cleaned RGB UI colors.
+
+    Returns:
+        The malformed-colors error key when runtime validation fails, otherwise None.
+
+    """
+    runtime_data = dict(data)
+    runtime_data[CONF_COLORS] = build_colors_from_rgb_dict(
+        runtime_data.get(CONF_COLOR_RGB_DICT, {})
+    )
+    try:
+        _validate_yaml_runtime_data(normalize_scene_input(runtime_data))
+    except vol.Invalid as err:
+        _LOGGER.debug("Invalid RGB UI color payload: %s", err)
         return ERROR_COLORS_MALFORMED
     return None
 
@@ -544,7 +567,10 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
                         )
                     }
                 )
-                return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
+                if error := _validate_rgb_ui_runtime_data(self._data):
+                    errors["base"] = error
+                else:
+                    return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
 
         return self.async_show_form(
             step_id="color_rgb_ui",
@@ -728,6 +754,19 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                         description_placeholders={"scene_name": self._data[CONF_NAME]},
                     )
                 self._data.update({CONF_COLOR_RGB_DICT: cleaned_color_rgb_dict})
+                if error := _validate_rgb_ui_runtime_data(self._data):
+                    errors["base"] = error
+                    return self.async_show_form(
+                        step_id="color_rgb_ui",
+                        data_schema=_build_color_rgb_ui_schema(
+                            user_input,
+                            color_data,
+                            options_flow=True,
+                            is_last_color=True,
+                        ),
+                        errors=errors,
+                        description_placeholders={"scene_name": self._data[CONF_NAME]},
+                    )
                 await self._async_stop_previous_animation_if_renamed()
                 self.hass.config_entries.async_update_entry(
                     self.config,
