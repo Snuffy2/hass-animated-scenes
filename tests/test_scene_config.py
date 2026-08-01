@@ -193,18 +193,69 @@ def test_validate_start_service_data_accepts_hourly_change_frequency() -> None:
 
 @pytest.mark.parametrize(
     (CONF_CHANGE_FREQUENCY, "expected"),
-    [(0, 0.0), ("0", 0.0), ([0, 1], [0.0, 1.0]), ("[0, 1]", [0.0, 1.0])],
+    [(0, 0.0), ("0", 0.0)],
 )
 def test_validate_start_service_data_accepts_zero_change_frequency(
     change_frequency: object, expected: float | list[float]
 ) -> None:
-    """Accept zero as a one-shot frequency, including range lower bounds."""
+    """Accept scalar zero as the explicit one-shot frequency."""
     data = normalize_scene_input(_base_input())
     data[CONF_CHANGE_FREQUENCY] = change_frequency
 
     result = validate_start_service_data(data)
 
     assert result[CONF_CHANGE_FREQUENCY] == expected
+
+
+@pytest.mark.parametrize(
+    (CONF_CHANGE_FREQUENCY, "expected"),
+    [
+        (0.1, 0.1),
+        ("0.1", 0.1),
+        ((0.1, 1), (0.1, 1.0)),
+        ("[0.1, 1]", [0.1, 1.0]),
+    ],
+)
+def test_validate_start_service_data_accepts_safe_repeating_frequency(
+    change_frequency: object, expected: float | list[float] | tuple[float, float]
+) -> None:
+    """Accept repeating values and range bounds beginning at 0.1 seconds."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_CHANGE_FREQUENCY] = change_frequency
+
+    result = validate_start_service_data(data)
+
+    assert result[CONF_CHANGE_FREQUENCY] == expected
+
+
+@pytest.mark.parametrize(
+    CONF_CHANGE_FREQUENCY,
+    [0.01, "0.01", (0, 0.1), "[0, 0.1]", (0.01, 0.09), "[0.01, 0.09]"],
+)
+def test_normalize_scene_input_rejects_unsafe_repeating_frequency(
+    change_frequency: object,
+) -> None:
+    """Reject repeating values or range bounds below 0.1 seconds."""
+    data = _base_input()
+    data[CONF_CHANGE_FREQUENCY] = change_frequency
+
+    with pytest.raises(vol.Invalid, match="change_frequency_not_int_or_range"):
+        normalize_scene_input(data)
+
+
+@pytest.mark.parametrize(
+    CONF_CHANGE_FREQUENCY,
+    [0.01, "0.01", (0, 0.1), "[0, 0.1]", (0.01, 0.09), "[0.01, 0.09]"],
+)
+def test_validate_start_service_data_rejects_unsafe_repeating_frequency(
+    change_frequency: object,
+) -> None:
+    """Reject unsafe repeating frequencies at the runtime service boundary."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_CHANGE_FREQUENCY] = change_frequency
+
+    with pytest.raises(vol.Invalid):
+        validate_start_service_data(data)
 
 
 @pytest.mark.parametrize(

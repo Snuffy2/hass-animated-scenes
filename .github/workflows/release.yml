@@ -6,7 +6,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.release.tag_name || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   update_version_and_create_zip:

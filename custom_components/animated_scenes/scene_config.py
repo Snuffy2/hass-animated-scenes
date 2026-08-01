@@ -25,6 +25,7 @@ from .const import (
     CHANGE_AMOUNT_MIN,
     CHANGE_FREQUENCY_MAX,
     CHANGE_FREQUENCY_MIN,
+    CHANGE_FREQUENCY_REPEAT_MIN,
     CONF_ANIMATE_BRIGHTNESS,
     CONF_ANIMATE_COLOR,
     CONF_ANIMATED_SCENE_SWITCH,
@@ -129,15 +130,15 @@ TRANSITION_VALUE_SCHEMA = vol.All(
 )
 CHANGE_FREQUENCY_VALUE_SCHEMA = vol.All(
     vol.Coerce(float),
-    vol.Range(
-        min=CHANGE_FREQUENCY_MIN,
-        max=CHANGE_FREQUENCY_MAX,
+    vol.Any(
+        vol.Equal(CHANGE_FREQUENCY_MIN),
+        vol.Range(min=CHANGE_FREQUENCY_REPEAT_MIN, max=CHANGE_FREQUENCY_MAX),
     ),
 )
 CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA = vol.All(
     vol.Coerce(float),
     vol.Range(
-        min=CHANGE_FREQUENCY_MIN,
+        min=CHANGE_FREQUENCY_REPEAT_MIN,
         max=CHANGE_FREQUENCY_MAX,
     ),
 )
@@ -491,11 +492,16 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
         raise vol.Invalid(ERROR_TRANSITION_NOT_INT_OR_RANGE)
     normalized[CONF_TRANSITION] = transition_value
 
-    frequency_ok, frequency_value = is_number_or_list(
-        normalized.get(CONF_CHANGE_FREQUENCY),
-        CHANGE_FREQUENCY_MIN,
-        CHANGE_FREQUENCY_MAX,
-    )
+    raw_frequency = normalized.get(CONF_CHANGE_FREQUENCY)
+    scalar_ok, scalar_frequency = is_number(raw_frequency)
+    if scalar_ok and scalar_frequency == CHANGE_FREQUENCY_MIN:
+        frequency_ok, frequency_value = True, scalar_frequency
+    else:
+        frequency_ok, frequency_value = is_number_or_list(
+            raw_frequency,
+            CHANGE_FREQUENCY_REPEAT_MIN,
+            CHANGE_FREQUENCY_MAX,
+        )
     if not frequency_ok:
         raise vol.Invalid(ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE)
     normalized[CONF_CHANGE_FREQUENCY] = frequency_value

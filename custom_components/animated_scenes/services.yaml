@@ -34,7 +34,7 @@ start_animation:
           unit_of_measurement: seconds
     change_frequency:
       name: Change Frequency
-      description: How often the animation should change something. Lower values mean things will be changing faster, which requires higher system specs.
+      description: Use 0 for a one-shot update. Repeating values must be between 0.1 and 3600 seconds.
       example: 1
       required: False
       default: 1

@@ -139,6 +139,19 @@ def test_rgb_to_kelvin_caches_repeated_lookup() -> None:
     assert _rgb_to_kelvin.cache_info().hits == 1
 
 
+def test_repeating_animation_frequency_is_never_zero(hass: HomeAssistant) -> None:
+    """Keep every accepted repeating frequency above zero at runtime."""
+    manager = _runtime_manager(hass)
+    hass.states.async_set("light.one", "on")
+
+    for change_frequency in (0.1, [0.1, 0.2]):
+        config = _animation_config("Repeating", ["light.one"])
+        config["change_frequency"] = change_frequency
+        animation = Animation(hass, manager.validate_start(config))
+
+        assert all(animation.get_change_frequency() >= 0.1 for _ in range(20))
+
+
 @pytest.mark.parametrize("kelvin", [2200, 4000, 6200])
 def test_kelvin_rgb_round_trip_stays_near_source(kelvin: int) -> None:
     """Keep warm, neutral, and cool conversions near their source temperature."""

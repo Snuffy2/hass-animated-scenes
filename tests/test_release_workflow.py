@@ -44,13 +44,14 @@ def test_edited_release_checkout_uses_release_tag() -> None:
     )
 
 
-def test_release_workflow_serializes_tag_updates() -> None:
-    """Tag-updating release runs serialize via workflow concurrency."""
+def test_release_workflow_queues_same_tag_mutations() -> None:
+    """Do not interrupt a same-tag release while it mutates remote state."""
     workflow = _workflow_text()
 
     assert "concurrency:" in workflow
     assert "${{ github.workflow }}-${{ github.event.release.tag_name || github.ref }}" in workflow
-    assert "cancel-in-progress: true" in workflow
+    assert "cancel-in-progress: false" in workflow
+    assert "cancel-in-progress: true" not in workflow
 
 
 def test_published_release_checkout_uses_release_tag() -> None:
