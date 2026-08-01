@@ -304,6 +304,50 @@ def test_validate_start_service_data_accepts_integral_change_amount(
     assert result[CONF_CHANGE_AMOUNT] == expected
 
 
+@pytest.mark.parametrize((CONF_PRIORITY, "expected"), [(1.0, 1), ("1.0", 1), ("-2", -2)])
+def test_validate_start_service_data_accepts_integral_priority(
+    priority: object, expected: int
+) -> None:
+    """Normalize integral float and numeric-string priorities to integers."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_PRIORITY] = priority
+
+    result = validate_start_service_data(data)
+
+    assert result[CONF_PRIORITY] == expected
+
+
+@pytest.mark.parametrize(CONF_PRIORITY, [1.5, "1.5", -2.5])
+def test_validate_start_service_data_rejects_fractional_priority(priority: object) -> None:
+    """Reject fractional priorities at the runtime service boundary."""
+    data = normalize_scene_input(_base_input())
+    data[CONF_PRIORITY] = priority
+
+    with pytest.raises(vol.Invalid):
+        validate_start_service_data(data)
+
+
+@pytest.mark.parametrize((CONF_PRIORITY, "expected"), [(1, 1), (1.0, 1), ("-2.0", -2)])
+def test_normalize_scene_input_accepts_integral_priority(priority: object, expected: int) -> None:
+    """Normalize integral priority forms consistently before manager validation."""
+    data = _base_input()
+    data[CONF_PRIORITY] = priority
+
+    result = normalize_scene_input(data)
+
+    assert result[CONF_PRIORITY] == expected
+
+
+@pytest.mark.parametrize(CONF_PRIORITY, [1.5, "1.5", -2.5])
+def test_normalize_scene_input_rejects_fractional_priority(priority: object) -> None:
+    """Reject fractional priorities before the manager can round them."""
+    data = _base_input()
+    data[CONF_PRIORITY] = priority
+
+    with pytest.raises(vol.Invalid, match="priority must be a number"):
+        normalize_scene_input(data)
+
+
 @pytest.mark.parametrize(
     CONF_CHANGE_FREQUENCY,
     [

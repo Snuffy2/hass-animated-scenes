@@ -30,7 +30,6 @@ from homeassistant.components.light import (
     ColorMode,
 )
 from homeassistant.const import (
-    ATTR_FRIENDLY_NAME,
     CONF_BRIGHTNESS,
     CONF_LIGHTS,
     CONF_NAME,
@@ -39,6 +38,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError, IntegrationError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util.color import (
     color_hs_to_RGB,
@@ -72,6 +72,7 @@ from .const import (
     CONF_RESTORE_POWER,
     CONF_SKIP_RESTORE,
     CONF_TRANSITION,
+    DOMAIN,
     EVENT_NAME_CHANGE,
     EVENT_STATE_STARTED,
     EVENT_STATE_STOPPED,
@@ -1130,11 +1131,34 @@ class Animations:
             name: str = config.get(CONF_NAME)
         else:
             switch_entity_id = config.get(CONF_ANIMATED_SCENE_SWITCH)
-            switch_state = self.hass.states.get(switch_entity_id)
-            if switch_state is None:
+            registry_entry = er.async_get(self.hass).async_get(switch_entity_id)
+            if registry_entry is None:
                 _LOGGER.error("Animated Scene Switch %s was not found", switch_entity_id)
                 raise IntegrationError(f"Animated Scene Switch {switch_entity_id} was not found")
-            name = switch_state.attributes.get(ATTR_FRIENDLY_NAME, switch_entity_id)
+            if registry_entry.platform != DOMAIN or registry_entry.config_entry_id is None:
+                _LOGGER.error("Switch %s does not belong to Animated Scenes", switch_entity_id)
+                raise IntegrationError(
+                    f"Switch {switch_entity_id} does not belong to Animated Scenes"
+                )
+            config_entry = self.hass.config_entries.async_get_entry(registry_entry.config_entry_id)
+            if config_entry is None or config_entry.domain != DOMAIN:
+                _LOGGER.error(
+                    "Animated Scene Switch %s has no resolvable config entry",
+                    switch_entity_id,
+                )
+                raise IntegrationError(
+                    f"Animated Scene Switch {switch_entity_id} has no resolvable config entry"
+                )
+            stored_name = config_entry.data.get(CONF_NAME)
+            if not isinstance(stored_name, str) or not stored_name:
+                _LOGGER.error(
+                    "Animated Scene Switch %s has no configured scene name",
+                    switch_entity_id,
+                )
+                raise IntegrationError(
+                    f"Animated Scene Switch {switch_entity_id} has no configured scene name"
+                )
+            name = stored_name
 
         if name not in self.animations:
             _LOGGER.error("Tried to add a light to an animation that doesn't exist")

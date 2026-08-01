@@ -147,6 +147,7 @@ CHANGE_AMOUNT_VALUE_SCHEMA = vol.All(
     _whole_float_to_int,
     vol.Range(min=CHANGE_AMOUNT_MIN, max=CHANGE_AMOUNT_MAX),
 )
+PRIORITY_VALUE_SCHEMA = vol.All(vol.Coerce(float), _whole_float_to_int)
 BRIGHTNESS_RANGE_SCHEMA = vol.Any(
     BRIGHTNESS_VALUE_SCHEMA,
     vol.ExactSequence(
@@ -241,7 +242,7 @@ START_SERVICE_CONFIG = {
     vol.Optional(CONF_CHANGE_SEQUENCE, default=DEFAULT_CHANGE_SEQUENCE): bool,
     vol.Optional(CONF_ANIMATE_BRIGHTNESS, default=DEFAULT_ANIMATE_BRIGHTNESS): bool,
     vol.Optional(CONF_ANIMATE_COLOR, default=DEFAULT_ANIMATE_COLOR): bool,
-    vol.Optional(CONF_PRIORITY, default=DEFAULT_PRIORITY): int,
+    vol.Optional(CONF_PRIORITY, default=DEFAULT_PRIORITY): PRIORITY_VALUE_SCHEMA,
     vol.Required(CONF_LIGHTS): cv.entity_ids,
     vol.Optional(CONF_COLORS, default=[]): vol.All(
         cv.ensure_list,
@@ -513,8 +514,10 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
         raise vol.Invalid(ERROR_BRIGHTNESS_NOT_INT_OR_RANGE)
     normalized[CONF_BRIGHTNESS] = brightness_value
     try:
-        normalized[CONF_PRIORITY] = round(normalized.get(CONF_PRIORITY, DEFAULT_PRIORITY))
-    except TypeError as err:
+        normalized[CONF_PRIORITY] = PRIORITY_VALUE_SCHEMA(
+            normalized.get(CONF_PRIORITY, DEFAULT_PRIORITY)
+        )
+    except vol.Invalid as err:
         raise vol.Invalid("priority must be a number") from err
     return normalized
 

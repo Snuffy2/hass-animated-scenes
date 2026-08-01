@@ -13,6 +13,7 @@ from homeassistant.config_entries import ConfigEntry, DiscoveryKey
 from homeassistant.const import CONF_NAME, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, IntegrationError
+from homeassistant.helpers import entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -29,6 +30,7 @@ from custom_components.animated_scenes.animations import (
     safe_call,
 )
 from custom_components.animated_scenes.const import (
+    CONF_ANIMATED_SCENE_SWITCH,
     CONF_COLOR,
     CONF_COLOR_TYPE,
     CONF_ENTITY_TYPE,
@@ -407,7 +409,67 @@ async def test_add_lights_to_animation_rejects_missing_switch(
 
     with pytest.raises(IntegrationError, match="was not found"):
         await manager.add_lights_to_animation(
-            {"animated_scene_switch": "switch.missing", CONF_LIGHTS: ["light.two"]}
+            {CONF_ANIMATED_SCENE_SWITCH: "switch.missing", CONF_LIGHTS: ["light.two"]}
+        )
+
+
+@pytest.mark.asyncio
+async def test_add_lights_to_animation_resolves_renamed_switch_by_config_entry(
+    hass: HomeAssistant,
+) -> None:
+    """Resolve a scene through stable registry identity after a display-name change."""
+    manager = _runtime_manager(hass)
+    animation = Animation(hass, _animation_config("Spooky", ["light.one"]))
+    manager.animations[animation.name] = animation
+    hass.states.async_set("light.two", "on", {"brightness": 100, "color_mode": "rgb"})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_ENTITY_TYPE: ENTITY_SCENE, CONF_NAME: "Spooky"},
+        entry_id="scene-spooky",
+    )
+    entry.add_to_hass(hass)
+    registry_entry = er.async_get(hass).async_get_or_create(
+        "switch",
+        DOMAIN,
+        entry.entry_id,
+        config_entry=entry,
+        suggested_object_id="renamed_spooky",
+    )
+    hass.states.async_set(
+        registry_entry.entity_id,
+        "on",
+        {"friendly_name": "User Renamed Scene"},
+    )
+
+    await manager.add_lights_to_animation(
+        {
+            CONF_ANIMATED_SCENE_SWITCH: registry_entry.entity_id,
+            CONF_LIGHTS: ["light.two"],
+        }
+    )
+
+    assert "light.two" in animation.lights
+
+
+@pytest.mark.asyncio
+async def test_add_lights_to_animation_rejects_unrelated_switch(
+    hass: HomeAssistant,
+) -> None:
+    """Reject switch entities that are not owned by Animated Scenes."""
+    manager = _runtime_manager(hass)
+    registry_entry = er.async_get(hass).async_get_or_create(
+        "switch",
+        "unrelated_integration",
+        "unrelated-switch",
+        suggested_object_id="unrelated",
+    )
+
+    with pytest.raises(IntegrationError, match="does not belong to Animated Scenes"):
+        await manager.add_lights_to_animation(
+            {
+                CONF_ANIMATED_SCENE_SWITCH: registry_entry.entity_id,
+                CONF_LIGHTS: ["light.two"],
+            }
         )
 
 
