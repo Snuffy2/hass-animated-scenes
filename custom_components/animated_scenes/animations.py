@@ -307,7 +307,9 @@ class Animation:
         """
         try:
             if Animations.instance and self._task:
-                while self._name in Animations.instance.animations and not self._task.done():
+                while (
+                    Animations.instance.animations.get(self._name) is self and not self._task.done()
+                ):
                     await self.update_lights()
                     frequency = self.get_change_frequency()
                     await asyncio.sleep(frequency)
@@ -797,6 +799,7 @@ class Animations:
         self._light_animations: dict[str, list[Animation]] = {}
         self.light_owner: dict[str, Animation] = {}
         self._conflicted_lights: dict[str, Any] = {}
+        self._mutation_lock = asyncio.Lock()
         self.hass: HomeAssistant = hass
 
     def build_attributes_from_state(self, state: State) -> LightAttributes:
@@ -917,6 +920,11 @@ class Animations:
 
     async def start(self, data: dict[str, Any]) -> None:
         """Validate input and start a new animation from service data."""
+        async with self._mutation_lock:
+            await self._start_unlocked(data)
+
+    async def _start_unlocked(self, data: dict[str, Any]) -> None:
+        """Start an animation while the caller holds the mutation lock."""
         config = self.validate_start(data)
         id_name: str = data[CONF_NAME]
         if id_name in self.animations:
@@ -931,6 +939,11 @@ class Animations:
 
     async def stop(self, data: dict[str, Any]) -> None:
         """Stop a running animation identified by service data."""
+        async with self._mutation_lock:
+            await self._stop_unlocked(data)
+
+    async def _stop_unlocked(self, data: dict[str, Any]) -> None:
+        """Stop an animation while the caller holds the mutation lock."""
         config = self.validate_stop(data)
         id_name: str = config[CONF_NAME]
         _LOGGER.info("Stopping animation '%s'", id_name)
@@ -948,6 +961,11 @@ class Animations:
             race with service-driven stops.
 
         """
+        async with self._mutation_lock:
+            await self._stop_by_name_unlocked(name)
+
+    async def _stop_by_name_unlocked(self, name: str) -> None:
+        """Stop a named animation while the caller holds the mutation lock."""
         animation = self.animations.get(name)
         if animation is not None:
             if isinstance(getattr(animation, "_task", None), Task):
@@ -964,8 +982,9 @@ class Animations:
             individual stop calls can mutate the manager safely.
 
         """
-        animations = list(self.animations.values())
-        await asyncio.gather(*(animation.stop() for animation in animations))
+        async with self._mutation_lock:
+            animations = list(self.animations.values())
+            await asyncio.gather(*(animation.stop() for animation in animations))
 
     def clear_runtime_state(self) -> None:
         """Clear listeners and all runtime ownership maps.
@@ -1014,8 +1033,9 @@ class Animations:
 
     def release_animation(self, animation: Animation) -> None:
         """Remove an animation from the active map and refresh listeners."""
-        del self.animations[animation.name]
-        self.refresh_listener()
+        if self.animations.get(animation.name) is animation:
+            self.animations.pop(animation.name, None)
+            self.refresh_listener()
 
     async def release_light(
         self,
@@ -1076,6 +1096,11 @@ class Animations:
         identify the target animation and will raise IntegrationError if
         the target animation does not exist or input is invalid.
         """
+        async with self._mutation_lock:
+            await self._add_lights_to_animation_unlocked(data)
+
+    async def _add_lights_to_animation_unlocked(self, data: dict[str, Any]) -> None:
+        """Add lights while the caller holds the mutation lock."""
         config = ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA(dict(data))
         lights: list = config.get(CONF_LIGHTS)
         if (
@@ -1115,6 +1140,11 @@ class Animations:
 
     async def remove_lights(self, data: dict[str, Any]) -> None:
         """Service handler to remove lights from animations and optionally restore."""
+        async with self._mutation_lock:
+            await self._remove_lights_unlocked(data)
+
+    async def _remove_lights_unlocked(self, data: dict[str, Any]) -> None:
+        """Remove lights while the caller holds the mutation lock."""
         config = REMOVE_LIGHTS_SERVICE_SCHEMA(dict(data))
         lights: list = config.get(CONF_LIGHTS)
         skip_restore: bool = config.get(CONF_SKIP_RESTORE)

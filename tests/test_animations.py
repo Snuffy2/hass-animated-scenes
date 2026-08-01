@@ -415,6 +415,87 @@ async def test_start_clamps_oversized_change_amount(hass: HomeAssistant) -> None
 
 
 @pytest.mark.asyncio
+async def test_concurrent_same_name_start_replaces_only_after_startup(
+    hass: HomeAssistant,
+) -> None:
+    """Serialize same-name starts and keep stale cleanup from removing the replacement."""
+    manager = _runtime_manager(hass)
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+    initial_update_started = asyncio.Event()
+    continue_initial_update = asyncio.Event()
+    call_count = 0
+
+    async def pause_first_update(*_: object) -> None:
+        """Pause only the first light service call across both starts."""
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            initial_update_started.set()
+            await continue_initial_update.wait()
+
+    with patch("custom_components.animated_scenes.animations.safe_call", pause_first_update):
+        first_start = asyncio.create_task(manager.start(_animation_config("Spooky", ["light.one"])))
+        await initial_update_started.wait()
+        original = manager.animations["Spooky"]
+        second_start = asyncio.create_task(
+            manager.start(_animation_config("Spooky", ["light.one"]))
+        )
+        await asyncio.sleep(0)
+
+        assert not second_start.done()
+
+        continue_initial_update.set()
+        await asyncio.gather(first_start, second_start)
+        replacement = manager.animations["Spooky"]
+
+        assert replacement is not original
+        assert original._task is not None
+        assert original._task.done()
+        assert replacement._task is not None
+        assert not replacement._task.done()
+
+        await original.release()
+
+        assert manager.animations["Spooky"] is replacement
+        await manager.stop({CONF_NAME: "Spooky"})
+
+
+@pytest.mark.asyncio
+async def test_remove_final_light_waits_for_startup_and_leaves_no_empty_task(
+    hass: HomeAssistant,
+) -> None:
+    """Serialize final-light removal until startup can create and stop its task."""
+    manager = _runtime_manager(hass)
+    hass.states.async_set("light.one", "on", {"brightness": 100, "color_mode": "rgb"})
+    initial_update_started = asyncio.Event()
+    continue_initial_update = asyncio.Event()
+
+    async def pause_initial_update(*_: object) -> None:
+        """Pause the startup light service call until removal is waiting."""
+        initial_update_started.set()
+        await continue_initial_update.wait()
+
+    with patch("custom_components.animated_scenes.animations.safe_call", pause_initial_update):
+        start_task = asyncio.create_task(manager.start(_animation_config("Spooky", ["light.one"])))
+        await initial_update_started.wait()
+        animation = manager.animations["Spooky"]
+        remove_task = asyncio.create_task(
+            manager.remove_lights({CONF_LIGHTS: ["light.one"], CONF_SKIP_RESTORE: True})
+        )
+        await asyncio.sleep(0)
+
+        assert not remove_task.done()
+
+        continue_initial_update.set()
+        await asyncio.gather(start_task, remove_task)
+
+    assert animation.get_active_lights() == []
+    assert animation._task is not None
+    assert animation._task.done()
+    assert manager.animations == {}
+
+
+@pytest.mark.asyncio
 async def test_update_lights_clamps_change_amount_to_active_lights(
     hass: HomeAssistant,
 ) -> None:
