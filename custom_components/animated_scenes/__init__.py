@@ -89,6 +89,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate legacy entries to persist their runtime entity type.
+
+    Args:
+        hass: Home Assistant instance managing the entry.
+        entry: Config entry to migrate.
+
+    Returns:
+        True when the entry is supported and migration completed.
+
+    """
+    if entry.version > 2:
+        return False
+    data = dict(entry.data)
+    data.setdefault(CONF_ENTITY_TYPE, ENTITY_SCENE)
+    hass.config_entries.async_update_entry(entry, data=data, version=2)
+    return True
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry and its platforms.
 
@@ -107,12 +126,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("Unloading: %s", entry.data)
     manager = Animations.instance
     unload_ok: bool = False
-    if entry.data.get(CONF_ENTITY_TYPE, None) == ENTITY_SCENE:
+    entity_type = entry.data.get(CONF_ENTITY_TYPE, ENTITY_SCENE)
+    if entity_type == ENTITY_SCENE:
         unload_ok = await hass.config_entries.async_unload_platforms(
             entry,
             [Platform.SWITCH],
         )
-    if entry.data.get(CONF_ENTITY_TYPE, None) == ENTITY_ACTIVITY_SENSOR:
+    if entity_type == ENTITY_ACTIVITY_SENSOR:
         unload_ok = await hass.config_entries.async_unload_platforms(
             entry,
             [Platform.SENSOR],

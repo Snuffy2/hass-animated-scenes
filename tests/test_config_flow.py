@@ -194,6 +194,17 @@ async def test_options_scene_form_exposes_name_for_rename(hass: HomeAssistant) -
     assert _schema_has_key(result["data_schema"], CONF_NAME)
 
 
+async def test_legacy_scene_without_entity_type_has_options(hass: HomeAssistant) -> None:
+    """Treat legacy options data without entity type as a scene."""
+    flow, _ = _options_flow(hass)
+    flow._data.pop(CONF_ENTITY_TYPE)
+
+    result = await flow.async_step_init()
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "scene"
+
+
 async def test_options_rgb_ui_defaults_missing_optional_color_values(
     hass: HomeAssistant,
 ) -> None:

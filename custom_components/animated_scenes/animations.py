@@ -933,7 +933,7 @@ class Animations:
             await self.animations[id_name].stop()
         _LOGGER.info("Starting animation '%s'", id_name)
         animation = Animation(self.hass, config)
-        for light in animation.lights:
+        for light in animation.get_active_lights():
             self._track_animation_light(animation, light)
         self.animations[id_name] = animation
         startup_complete = False
@@ -1139,10 +1139,11 @@ class Animations:
 
         animation: Animation = self.animations[name]
 
-        for light in lights:
-            self._track_animation_light(animation, light)
-
         animation.add_lights(lights)
+        active_lights = animation.get_active_lights()
+        for light in lights:
+            if light in active_lights:
+                self._track_animation_light(animation, light)
         self.fire_animation_change(name, EVENT_STATE_UPDATED)
 
     async def remove_lights(self, data: dict[str, Any]) -> None:

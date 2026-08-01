@@ -9,12 +9,18 @@ from typing import cast
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import ConfigEntry, DiscoveryKey
-from homeassistant.const import CONF_NAME
+from homeassistant.const import CONF_NAME, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, IntegrationError
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.animated_scenes import async_setup, async_setup_entry, async_unload_entry
+from custom_components.animated_scenes import (
+    async_migrate_entry,
+    async_setup,
+    async_setup_entry,
+    async_unload_entry,
+)
 from custom_components.animated_scenes.animations import (
     Animation,
     Animations,
@@ -26,6 +32,7 @@ from custom_components.animated_scenes.const import (
     CONF_LIGHTS,
     CONF_SKIP_RESTORE,
     DOMAIN,
+    ENTITY_ACTIVITY_SENSOR,
     ENTITY_SCENE,
     EVENT_NAME_CHANGE,
     EVENT_STATE_UPDATED,
@@ -327,6 +334,32 @@ async def test_add_lights_to_animation_rejects_missing_switch(
 
 
 @pytest.mark.asyncio
+async def test_add_lights_tracks_only_lights_that_become_active(hass: HomeAssistant) -> None:
+    """Exclude missing and ignored-off additions from ownership maps."""
+    manager = _runtime_manager(hass)
+    animation = _tracked_animation(hass, manager)
+    animation._ignore_off = False
+    hass.states.async_set("light.off", "off")
+
+    await manager.add_lights_to_animation(
+        {CONF_NAME: "Spooky", CONF_LIGHTS: ["light.missing", "light.off"]}
+    )
+
+    assert "light.missing" not in manager.light_owner
+    assert "light.off" not in manager.light_owner
+    assert "light.missing" not in manager._light_animations
+    assert "light.off" not in manager._light_animations
+
+    hass.states.async_set("light.off", "on")
+    await manager.add_lights_to_animation(
+        {CONF_NAME: "Spooky", CONF_LIGHTS: ["light.missing", "light.off"]}
+    )
+
+    assert manager.light_owner["light.off"] is animation
+    assert "light.missing" not in manager.light_owner
+
+
+@pytest.mark.asyncio
 async def test_remove_lights_fires_update_event(hass: HomeAssistant) -> None:
     """Notify event-driven entities after removing lights from animations."""
     manager = _runtime_manager(hass)
@@ -412,6 +445,31 @@ async def test_start_clamps_oversized_change_amount(hass: HomeAssistant) -> None
 
     assert manager.animations["Spooky"].get_change_amount() == 1
     await manager.stop({"name": "Spooky"})
+
+
+@pytest.mark.asyncio
+async def test_start_tracks_only_active_lights_across_restart(hass: HomeAssistant) -> None:
+    """Avoid stale ownership for missing and ignored-off configured lights."""
+    manager = _runtime_manager(hass)
+    hass.states.async_set("light.active", "on")
+    hass.states.async_set("light.off", "off")
+    config = _animation_config("Spooky", ["light.active", "light.off", "light.missing"])
+    config["ignore_off"] = False
+
+    with patch("custom_components.animated_scenes.animations.safe_call", AsyncMock()):
+        await manager.start(config)
+
+        assert set(manager.light_owner) == {"light.active"}
+        assert set(manager._light_animations) == {"light.active"}
+
+        await manager.stop({CONF_NAME: "Spooky"})
+        hass.states.async_set("light.off", "on")
+        await manager.start(config)
+
+        assert set(manager.light_owner) == {"light.active", "light.off"}
+        assert "light.missing" not in manager._light_animations
+
+        await manager.stop({CONF_NAME: "Spooky"})
 
 
 @pytest.mark.asyncio
@@ -745,6 +803,58 @@ async def test_setup_entry_recreates_manager_after_last_entry_unload(
         assert await async_setup_entry(hass, entry) is True
 
     assert Animations.instance is not None
+
+
+@pytest.mark.parametrize(
+    ("data", "expected_type"),
+    [
+        ({CONF_NAME: "Legacy"}, ENTITY_SCENE),
+        (
+            {CONF_NAME: "Activity Sensor", CONF_ENTITY_TYPE: ENTITY_ACTIVITY_SENSOR},
+            ENTITY_ACTIVITY_SENSOR,
+        ),
+    ],
+)
+async def test_migrate_entry_persists_entity_type(
+    hass: HomeAssistant, data: dict[str, str], expected_type: str
+) -> None:
+    """Default legacy scenes while preserving explicit activity sensors."""
+    entry = MockConfigEntry(domain=DOMAIN, data=data, version=1)
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is True
+
+    assert entry.version == 2
+    assert entry.data[CONF_ENTITY_TYPE] == expected_type
+
+
+@pytest.mark.asyncio
+async def test_legacy_scene_setup_and_unload_use_switch_default(hass: HomeAssistant) -> None:
+    """Set up and unload legacy scene entries without persisted entity type."""
+    manager = _runtime_manager(hass)
+    animation = AsyncMock()
+    animation.name = "Legacy"
+    manager.animations["Legacy"] = animation
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Legacy",
+        data={CONF_NAME: "Legacy"},
+        entry_id="legacy",
+    )
+    entry.add_to_hass(hass)
+
+    with (
+        patch.object(hass.config_entries, "async_forward_entry_setups", AsyncMock()) as forward,
+        patch.object(
+            hass.config_entries, "async_unload_platforms", AsyncMock(return_value=True)
+        ) as unload,
+    ):
+        assert await async_setup_entry(hass, entry) is True
+        assert await async_unload_entry(hass, entry) is True
+
+    forward.assert_awaited_once_with(entry, [Platform.SWITCH])
+    unload.assert_awaited_once_with(entry, [Platform.SWITCH])
+    animation.release.assert_awaited_once()
 
 
 @pytest.mark.asyncio

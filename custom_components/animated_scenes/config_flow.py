@@ -21,7 +21,6 @@ import voluptuous as vol
 from .animations import Animations
 from .const import (
     ABORT_ACTIVITY_SENSOR_NO_OPTIONS,
-    ABORT_INTEGRATION_NO_OPTIONS,
     BRIGHTNESS_MAX,
     BRIGHTNESS_MIN,
     COLOR_SELECTOR_RGB_UI,
@@ -415,7 +414,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
     instance of the integration via the UI or importing YAML.
     """
 
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self) -> None:
         """Initialize."""
@@ -597,8 +596,6 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         """Manage the options."""
         if self._data.get(CONF_ENTITY_TYPE, ENTITY_SCENE) == ENTITY_ACTIVITY_SENSOR:
             return self.async_abort(reason=ABORT_ACTIVITY_SENSOR_NO_OPTIONS)
-        if self._data.get(CONF_ENTITY_TYPE) is None:
-            return self.async_abort(reason=ABORT_INTEGRATION_NO_OPTIONS)
         return await self.async_step_scene(user_input=user_input)
 
     async def async_step_scene(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
