@@ -131,7 +131,6 @@ CHANGE_FREQUENCY_VALUE_SCHEMA = vol.All(
     vol.Range(
         min=CHANGE_FREQUENCY_MIN,
         max=CHANGE_FREQUENCY_MAX,
-        min_included=False,
     ),
 )
 CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA = vol.All(
@@ -139,7 +138,6 @@ CHANGE_FREQUENCY_RANGE_VALUE_SCHEMA = vol.All(
     vol.Range(
         min=CHANGE_FREQUENCY_MIN,
         max=CHANGE_FREQUENCY_MAX,
-        min_included=False,
     ),
 )
 CHANGE_AMOUNT_VALUE_SCHEMA = vol.All(
@@ -474,7 +472,6 @@ def normalize_scene_input(data: dict[str, Any]) -> dict[str, Any]:
         normalized.get(CONF_CHANGE_FREQUENCY),
         CHANGE_FREQUENCY_MIN,
         CHANGE_FREQUENCY_MAX,
-        min_included=False,
     )
     if not frequency_ok:
         raise vol.Invalid(ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE)

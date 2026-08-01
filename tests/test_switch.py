@@ -188,14 +188,17 @@ async def test_switch_tracks_animation_events(hass: HomeAssistant) -> None:
 
 @pytest.mark.asyncio
 async def test_switch_turn_on_stays_off_for_one_shot_scene(hass: HomeAssistant) -> None:
-    """Keep one-shot scenes off after the manager releases them during startup."""
+    """Apply one initial update before a one-shot scene releases itself."""
     manager = _runtime_manager(hass)
+    hass.states.async_set("light.one", "off")
     config = _switch_config()
     config["change_frequency"] = 0
     switch = AnimatedSceneSwitch(hass, config, "entry-id")
 
-    await switch.async_turn_on()
+    with patch("custom_components.animated_scenes.animations.safe_call", AsyncMock()) as safe_call:
+        await switch.async_turn_on()
 
+    assert any(call.args[3]["entity_id"] == "light.one" for call in safe_call.await_args_list)
     assert switch.is_on is False
     assert manager.animations == {}
 

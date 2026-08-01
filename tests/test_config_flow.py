@@ -12,7 +12,10 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.animated_scenes.animations import Animation, Animations
-from custom_components.animated_scenes.config_flow import AnimatedScenesOptionsFlowHandler
+from custom_components.animated_scenes.config_flow import (
+    AnimatedScenesConfigFlow,
+    AnimatedScenesOptionsFlowHandler,
+)
 from custom_components.animated_scenes.const import (
     COLOR_SELECTOR_RGB_UI,
     COLOR_SELECTOR_YAML,
@@ -34,6 +37,7 @@ from custom_components.animated_scenes.const import (
     ERROR_BRIGHTNESS_NOT_INT_OR_RANGE,
     ERROR_COLORS_IS_BLANK,
     ERROR_COLORS_MALFORMED,
+    ERROR_SCENE_NAME_EXISTS,
 )
 from custom_components.animated_scenes.scene_config import (
     build_colors_from_rgb_dict,
@@ -81,6 +85,66 @@ def _options_flow(
     flow = AnimatedScenesOptionsFlowHandler(entry)
     flow.hass = hass
     return flow, entry
+
+
+def _scene_input(name: str) -> dict[str, object]:
+    """Return valid scene-step input using the YAML color path."""
+    return {
+        CONF_NAME: name,
+        CONF_LIGHTS: ["light.one"],
+        CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_YAML,
+    }
+
+
+def _existing_scene(hass: HomeAssistant, name: str, entry_id: str) -> MockConfigEntry:
+    """Add and return an existing scene config entry."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=name,
+        data={CONF_NAME: name, CONF_ENTITY_TYPE: ENTITY_SCENE},
+        entry_id=entry_id,
+    )
+    entry.add_to_hass(hass)
+    return entry
+
+
+async def test_scene_creation_rejects_duplicate_name(hass: HomeAssistant) -> None:
+    """Reject a UI-created scene whose runtime name is already in use."""
+    _existing_scene(hass, "Spooky", "existing")
+    flow = AnimatedScenesConfigFlow()
+    flow.hass = hass
+
+    result = await flow.async_step_scene(_scene_input("Spooky"))
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "scene"
+    assert result["errors"] == {"base": ERROR_SCENE_NAME_EXISTS}
+
+
+async def test_scene_import_rejects_duplicate_name(hass: HomeAssistant) -> None:
+    """Reject an imported scene whose runtime name is already in use."""
+    _existing_scene(hass, "Spooky", "existing")
+    flow = AnimatedScenesConfigFlow()
+    flow.hass = hass
+
+    result = await flow.async_step_import(_scene_input("Spooky"))
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "scene"
+    assert result["errors"] == {"base": ERROR_SCENE_NAME_EXISTS}
+
+
+async def test_options_rename_rejects_duplicate_name(hass: HomeAssistant) -> None:
+    """Reject renaming a scene to another entry's runtime name."""
+    flow, entry = _options_flow(hass)
+    _existing_scene(hass, "Scary", "other")
+
+    result = await flow.async_step_scene({CONF_NAME: "Scary"})
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "scene"
+    assert result["errors"] == {"base": ERROR_SCENE_NAME_EXISTS}
+    assert entry.data[CONF_NAME] == "Spooky"
 
 
 async def test_options_rgb_ui_handles_empty_existing_color_dict(hass: HomeAssistant) -> None:

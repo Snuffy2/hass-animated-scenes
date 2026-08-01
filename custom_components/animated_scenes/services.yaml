@@ -40,7 +40,7 @@ start_animation:
       default: 1
       selector:
         number:
-          min: 0.1
+          min: 0
           max: 3600
           step: 0.1
           unit_of_measurement: seconds

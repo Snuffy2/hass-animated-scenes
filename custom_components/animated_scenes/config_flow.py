@@ -12,7 +12,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_BRIGHTNESS, CONF_ICON, CONF_LIGHTS, CONF_NAME, Platform
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
 import homeassistant.helpers.config_validation as cv
 from homeassistant.util import uuid
@@ -71,6 +71,7 @@ from .const import (
     ERROR_BRIGHTNESS_NOT_INT_OR_RANGE,
     ERROR_COLORS_IS_BLANK,
     ERROR_COLORS_MALFORMED,
+    ERROR_SCENE_NAME_EXISTS,
 )
 from .scene_config import (
     SCENE_DEFAULTS,
@@ -94,6 +95,26 @@ RGB_UI_COLOR_DEFAULTS = {
     CONF_COLOR_ADD_COLOR: DEFAULT_COLOR_ADD_COLOR,
     CONF_COLOR_DELETE_COLOR: DEFAULT_COLOR_DELETE_COLOR,
 }
+
+
+def _scene_name_exists(hass: HomeAssistant, name: str, exclude_entry_id: str | None = None) -> bool:
+    """Return whether another scene config entry already uses a name.
+
+    Args:
+        hass: Home Assistant instance containing config entries.
+        name: Proposed runtime scene name.
+        exclude_entry_id: Entry id to ignore while validating an options rename.
+
+    Returns:
+        True when another Animated Scenes scene entry uses the proposed name.
+
+    """
+    return any(
+        entry.entry_id != exclude_entry_id
+        and entry.data.get(CONF_ENTITY_TYPE, ENTITY_SCENE) == ENTITY_SCENE
+        and entry.data.get(CONF_NAME) == name
+        for entry in hass.config_entries.async_entries(DOMAIN)
+    )
 
 
 def _validate_yaml_runtime_data(data: dict[str, Any]) -> None:
@@ -436,10 +457,13 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data.update(user_input)
             self._data.update({CONF_ENTITY_TYPE: ENTITY_SCENE})
-            try:
-                self._data = normalize_scene_input(self._data)
-            except vol.Invalid as err:
-                errors["base"] = str(err)
+            if _scene_name_exists(self.hass, self._data[CONF_NAME]):
+                errors["base"] = ERROR_SCENE_NAME_EXISTS
+            else:
+                try:
+                    self._data = normalize_scene_input(self._data)
+                except vol.Invalid as err:
+                    errors["base"] = str(err)
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
             if not errors:
@@ -585,10 +609,13 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             self._data.update(user_input)
             self._data.update({CONF_ENTITY_TYPE: ENTITY_SCENE})
-            try:
-                self._data = normalize_scene_input(self._data)
-            except vol.Invalid as err:
-                errors["base"] = str(err)
+            if _scene_name_exists(self.hass, self._data[CONF_NAME], self.config.entry_id):
+                errors["base"] = ERROR_SCENE_NAME_EXISTS
+            else:
+                try:
+                    self._data = normalize_scene_input(self._data)
+                except vol.Invalid as err:
+                    errors["base"] = str(err)
             for k, v in defaults.items():
                 self._data.setdefault(k, v)
             if not errors:

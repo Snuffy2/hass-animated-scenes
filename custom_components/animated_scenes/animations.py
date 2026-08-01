@@ -1121,17 +1121,22 @@ class Animations:
         affected_animations: set[Animation] = set()
         updates: list = []
         for light in lights:
-            if light in self.light_owner:
-                animation: Animation = self.light_owner[light]
-                _LOGGER.info("Releasing light '%s' from animation '%s'", light, animation.name)
+            tracked_animations = list(self._light_animations.get(light, []))
+            owner = self.light_owner.get(light)
+            if owner is not None and owner not in tracked_animations:
+                tracked_animations.append(owner)
+            for animation in tracked_animations:
+                _LOGGER.info("Removing light '%s' from animation '%s'", light, animation.name)
                 affected_animations.add(animation)
                 animation.remove_light(light)
-                updates.append(self.release_light(animation, light, True, skip_restore))
+            self._light_animations.pop(light, None)
+            if owner is not None:
+                updates.append(self.release_light(owner, light, True, skip_restore))
+            elif tracked_animations:
+                self.states.pop(light, None)
+                self.refresh_listener()
 
         await asyncio.gather(*updates)
-        for light in lights:
-            if light in self._light_animations and not self._light_animations[light]:
-                del self._light_animations[light]
         for animation in affected_animations:
             if len(animation.get_active_lights()) == 0:
                 await animation.stop()

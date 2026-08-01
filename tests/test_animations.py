@@ -364,6 +364,40 @@ async def test_remove_lights_updates_refresh_membership(hass: HomeAssistant) -> 
 
 
 @pytest.mark.asyncio
+async def test_remove_lights_removes_overlapping_light_from_every_animation(
+    hass: HomeAssistant,
+) -> None:
+    """Remove an overlapping light from all priorities and future updates."""
+    manager = _runtime_manager(hass)
+    for light in ("light.one", "light.low", "light.high"):
+        hass.states.async_set(light, "on", {"brightness": 100, "color_mode": "rgb"})
+    low = Animation(
+        hass,
+        manager.validate_start(_animation_config("Low", ["light.one", "light.low"], priority=1)),
+    )
+    high = Animation(
+        hass,
+        manager.validate_start(_animation_config("High", ["light.one", "light.high"], priority=10)),
+    )
+    manager.animations = {low.name: low, high.name: high}
+    for animation in (low, high):
+        for light in animation.lights:
+            manager._track_animation_light(animation, light)
+    manager.store_state("light.one")
+
+    await manager.remove_lights({CONF_LIGHTS: ["light.one"], CONF_SKIP_RESTORE: True})
+
+    with patch("custom_components.animated_scenes.animations.safe_call", AsyncMock()) as safe_call:
+        await asyncio.gather(low.update_lights(), high.update_lights())
+
+    assert "light.one" not in low.lights
+    assert "light.one" not in high.lights
+    assert "light.one" not in manager._light_animations
+    assert "light.one" not in manager.light_owner
+    assert all(call.args[3]["entity_id"] != "light.one" for call in safe_call.await_args_list)
+
+
+@pytest.mark.asyncio
 async def test_start_clamps_oversized_change_amount(hass: HomeAssistant) -> None:
     """Normalize service change_amount before the animation loop can sample lights."""
     manager = _runtime_manager(hass)

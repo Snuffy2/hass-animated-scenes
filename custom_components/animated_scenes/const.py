@@ -83,6 +83,7 @@ ERROR_COLORS_IS_BLANK = "colors_is_blank"
 ERROR_COLORS_MALFORMED = "colors_malformed"
 ERROR_BRIGHTNESS_NOT_INT_OR_RANGE = "brightness_not_int_or_range"
 ERROR_MUST_SELECT_LIGHTS = "must_select_lights"
+ERROR_SCENE_NAME_EXISTS = "scene_name_exists"
 ABORT_ACTIVITY_SENSOR_NO_OPTIONS = "activity_sensor_no_options"
 ABORT_INTEGRATION_NO_OPTIONS = "integration_no_options"
 
