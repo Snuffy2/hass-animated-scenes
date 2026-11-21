@@ -84,9 +84,9 @@ from .const import (
 from .scene_config import (
     ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA,
     REMOVE_LIGHTS_SERVICE_SCHEMA,
-    START_SERVICE_SCHEMA,
     STOP_SERVICE_SCHEMA,
     normalize_scene_input,
+    validate_start_service_data,
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -1184,19 +1184,10 @@ class Animations:
         """Add lights while the caller holds the mutation lock."""
         config = ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA(dict(data))
         lights: list = config.get(CONF_LIGHTS)
-        if (
-            config.get(CONF_NAME, None) is not None
-            and config.get(CONF_ANIMATED_SCENE_SWITCH, None) is not None
-        ) or (
-            config.get(CONF_NAME, None) is None
-            and config.get(CONF_ANIMATED_SCENE_SWITCH, None) is None
-        ):
-            _LOGGER.error(
-                "Animated Scene Name or Animated Scene Switch must be listed but not both"
-            )
-            raise IntegrationError(
-                "Animated Scene Name or Animated Scene Switch must be listed but not both"
-            )
+        if (config.get(CONF_NAME) is None) == (config.get(CONF_ANIMATED_SCENE_SWITCH) is None):
+            message = "Animated Scene Name or Animated Scene Switch must be listed but not both"
+            _LOGGER.error(message)
+            raise IntegrationError(message)
         if config.get(CONF_NAME, None) is not None:
             name: str = config.get(CONF_NAME)
         else:
@@ -1293,21 +1284,36 @@ class Animations:
 
         Raises IntegrationError if validation fails.
         """
-        try:
-            config = START_SERVICE_SCHEMA(normalize_scene_input(dict(data)))
-        except vol.Invalid as err:
-            _LOGGER.exception("Error with received configuration")
-            raise IntegrationError("Service data did not match schema") from err
-        return config
+        return self._validate_service_data(
+            lambda raw: validate_start_service_data(normalize_scene_input(raw)), data
+        )
 
     def validate_stop(self, data: dict[str, Any]) -> dict[str, Any]:
         """Validate stop service data against the STOP_SERVICE_SCHEMA.
 
         Raises IntegrationError if validation fails.
         """
+        return self._validate_service_data(STOP_SERVICE_SCHEMA, data)
+
+    @staticmethod
+    def _validate_service_data(
+        validate: Callable[[dict[str, Any]], dict[str, Any]], data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Run a validator over service data, converting schema errors for callers.
+
+        Args:
+            validate: Callable that validates a copy of the data and raises vol.Invalid.
+            data: Raw service call data.
+
+        Returns:
+            The validated service configuration.
+
+        Raises:
+            IntegrationError: If the data does not match the schema.
+
+        """
         try:
-            config = STOP_SERVICE_SCHEMA(dict(data))
+            return validate(dict(data))
         except vol.Invalid as err:
             _LOGGER.exception("Error with received configuration")
             raise IntegrationError("Service data did not match schema") from err
-        return config
