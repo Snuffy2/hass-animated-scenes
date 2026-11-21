@@ -3,12 +3,21 @@
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
+from homeassistant.const import CONF_NAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 
 from .animations import Animations
-from .const import CONF_ENTITY_TYPE, DOMAIN, ENTITY_ACTIVITY_SENSOR, ENTITY_SCENE
+from .const import (
+    CONF_ENTITY_TYPE,
+    DOMAIN,
+    ENTITY_ACTIVITY_SENSOR,
+    ENTITY_SCENE,
+    SERVICE_ADD_LIGHTS_TO_ANIMATION,
+    SERVICE_REMOVE_LIGHTS,
+    SERVICE_START_ANIMATION,
+    SERVICE_STOP_ANIMATION,
+)
 from .scene_config import (
     ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA,
     REMOVE_LIGHTS_SERVICE_SCHEMA,
@@ -37,25 +46,25 @@ async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
     """
     hass.services.async_register(
         DOMAIN,
-        "start_animation",
+        SERVICE_START_ANIMATION,
         start_animation,
         schema=START_SERVICE_SCHEMA,  # type: ignore[arg-type, unused-ignore]
     )
     hass.services.async_register(
         DOMAIN,
-        "stop_animation",
+        SERVICE_STOP_ANIMATION,
         stop_animation,
         schema=STOP_SERVICE_SCHEMA,  # type: ignore[arg-type, unused-ignore]
     )
     hass.services.async_register(
         DOMAIN,
-        "remove_lights",
+        SERVICE_REMOVE_LIGHTS,
         remove_lights,
         schema=REMOVE_LIGHTS_SERVICE_SCHEMA,  # type: ignore[arg-type, unused-ignore]
     )
     hass.services.async_register(
         DOMAIN,
-        "add_lights_to_animation",
+        SERVICE_ADD_LIGHTS_TO_ANIMATION,
         add_lights_to_animation,
         schema=ADD_LIGHTS_TO_ANIMATION_SERVICE_SCHEMA,  # type: ignore[arg-type, unused-ignore]
     )
@@ -139,7 +148,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok and manager and entity_type == ENTITY_SCENE:
         # Stop the name that was loaded; entry.data may already hold a renamed value.
         loaded_config = getattr(entry, "runtime_data", None) or entry.data
-        name = loaded_config.get("name")
+        name = loaded_config.get(CONF_NAME)
         if name is not None:
             await manager.stop_by_name(name)
     return unload_ok

@@ -13,7 +13,6 @@ CONF_ANIMATE_COLOR = "animate_color"
 CONF_CHANGE_AMOUNT = "change_amount"
 CONF_CHANGE_FREQUENCY = "change_frequency"
 CONF_CHANGE_SEQUENCE = "change_sequence"
-CONF_LIGHTS = "lights"
 CONF_COLORS = "colors"
 CONF_COLOR = "color"
 CONF_COLOR_TYPE = "color_type"
@@ -74,6 +73,7 @@ CHANGE_AMOUNT_MAX = 65535
 BRIGHTNESS_MIN = 0
 BRIGHTNESS_MAX = 255
 
+ERROR_FIELD_BASE = "base"
 ERROR_CHANGE_AMOUNT_NOT_INT_OR_ALL = "change_amount_not_int_or_all"
 ERROR_CHANGE_FREQUENCY_NOT_INT_OR_RANGE = "change_frequency_not_int_or_range"
 ERROR_TRANSITION_NOT_INT_OR_RANGE = "transition_not_int_or_range"
@@ -86,6 +86,11 @@ ERROR_SCENE_NAME_BLANK = "scene_name_blank"
 ERROR_SCENE_NAME_EXISTS = "scene_name_exists"
 ABORT_ACTIVITY_SENSOR_NO_OPTIONS = "activity_sensor_no_options"
 ABORT_ACTIVITY_SENSOR_EXISTS = "activity_sensor_exists"
+
+SERVICE_START_ANIMATION = "start_animation"
+SERVICE_STOP_ANIMATION = "stop_animation"
+SERVICE_REMOVE_LIGHTS = "remove_lights"
+SERVICE_ADD_LIGHTS_TO_ANIMATION = "add_lights_to_animation"
 
 EVENT_NAME_CHANGE = "animated_scenes_change"
 EVENT_STATE_STARTED = "started"
