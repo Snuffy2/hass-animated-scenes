@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import copy
 import math
 from typing import Any
@@ -421,32 +422,32 @@ REMOVE_LIGHTS_SERVICE_SCHEMA = vol.Schema(
 )
 
 
-def is_int(value: Any) -> tuple[bool, Any]:
-    """Return whether value is integer-like and its normalized value."""
+def _parse_finite_number(value: Any) -> float | None:
+    """Return a finite float parsed from an int, float, or string, otherwise None."""
     if value is None or not isinstance(value, int | float | str):
-        return False, value
+        return None
     try:
         parsed = float(value)
     except TypeError, ValueError:
-        return False, value
-    if parsed.is_integer():
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
+def is_int(value: Any) -> tuple[bool, Any]:
+    """Return whether value is integer-like and its normalized value."""
+    parsed = _parse_finite_number(value)
+    if parsed is not None and parsed.is_integer():
         return True, int(parsed)
     return False, value
 
 
 def is_number(value: Any) -> tuple[bool, Any]:
     """Return whether value is numeric and its normalized value."""
-    is_int_check, is_int_value = is_int(value)
-    if is_int_check:
-        return True, is_int_value
-    if value is None or not isinstance(value, int | float | str):
+    parsed = _parse_finite_number(value)
+    if parsed is None:
         return False, value
-    try:
-        parsed = float(value)
-    except TypeError, ValueError:
-        return False, value
-    if not math.isfinite(parsed):
-        return False, value
+    if parsed.is_integer():
+        return True, int(parsed)
     return True, parsed
 
 
@@ -460,19 +461,41 @@ def list_or_int_to_str(value: Any) -> Any:
     return value
 
 
-def is_int_or_list(
-    value: Any, min_value: int | None = None, max_value: int | None = None
+def _normalize_scalar_or_range(
+    value: Any,
+    parse: Callable[[Any], tuple[bool, Any]],
+    min_value: float | None,
+    max_value: float | None,
+    min_included: bool,
 ) -> tuple[bool, Any]:
-    """Validate and normalize an int or two-item integer range."""
+    """Validate and normalize a scalar or two-item range using a scalar parser.
+
+    Args:
+        value: Raw scalar, two-item list/tuple, or ``"[a, b]"`` string.
+        parse: Scalar parser returning ``(is_valid, normalized_value)``.
+        min_value: Optional lower bound for every parsed number.
+        max_value: Optional upper bound for every parsed number.
+        min_included: Whether ``min_value`` itself is an allowed value.
+
+    Returns:
+        ``(True, normalized)`` for valid input, where a range with equal ends
+        collapses to a scalar, otherwise ``(False, value)``.
+
+    """
     if value is None:
         return True, value
-    is_int_check, is_int_value = is_int(value)
-    if is_int_check:
-        if (min_value is None or is_int_value >= min_value) and (
-            max_value is None or is_int_value <= max_value
+
+    def in_bounds(number: float) -> bool:
+        """Return whether number satisfies the configured bounds."""
+        if min_value is not None and (
+            number < min_value or (not min_included and number == min_value)
         ):
-            return True, is_int_value
-        return False, value
+            return False
+        return max_value is None or number <= max_value
+
+    is_scalar, scalar = parse(value)
+    if is_scalar:
+        return (True, scalar) if in_bounds(scalar) else (False, value)
     if isinstance(value, str):
         value = value.strip()
         if value.startswith("[") and value.endswith("]") and value.count(",") == 1:
@@ -480,18 +503,21 @@ def is_int_or_list(
         else:
             return False, value
     if isinstance(value, list | tuple) and len(value) == 2:
-        is_first, first = is_int(value[0])
-        is_second, second = is_int(value[1])
+        is_first, first = parse(value[0])
+        is_second, second = parse(value[1])
         if not (is_first and is_second):
             return False, value
-        normalized = [min(first, second), max(first, second)]
-        if (min_value is None or min(normalized) >= min_value) and (
-            max_value is None or max(normalized) <= max_value
-        ):
-            if normalized[0] == normalized[1]:
-                return True, normalized[0]
-            return True, normalized
+        low, high = min(first, second), max(first, second)
+        if in_bounds(low) and in_bounds(high):
+            return True, low if low == high else [low, high]
     return False, value
+
+
+def is_int_or_list(
+    value: Any, min_value: int | None = None, max_value: int | None = None
+) -> tuple[bool, Any]:
+    """Validate and normalize an int or two-item integer range."""
+    return _normalize_scalar_or_range(value, is_int, min_value, max_value, True)
 
 
 def is_number_or_list(
@@ -501,37 +527,7 @@ def is_number_or_list(
     min_included: bool = True,
 ) -> tuple[bool, Any]:
     """Validate and normalize a number or two-item numeric range."""
-    if value is None:
-        return True, value
-    is_number_check, number_value = is_number(value)
-    if is_number_check:
-        above_min = min_value is None or (
-            number_value >= min_value if min_included else number_value > min_value
-        )
-        if above_min and (max_value is None or number_value <= max_value):
-            return True, number_value
-        return False, value
-    if isinstance(value, str):
-        value = value.strip()
-        if value.startswith("[") and value.endswith("]") and value.count(",") == 1:
-            value = _strlist_to_list(value)
-        else:
-            return False, value
-    if isinstance(value, list | tuple) and len(value) == 2:
-        is_first, first = is_number(value[0])
-        is_second, second = is_number(value[1])
-        if not (is_first and is_second):
-            return False, value
-        normalized = [min(first, second), max(first, second)]
-        lowest = min(normalized)
-        above_min = min_value is None or (
-            lowest >= min_value if min_included else lowest > min_value
-        )
-        if above_min and (max_value is None or max(normalized) <= max_value):
-            if normalized[0] == normalized[1]:
-                return True, normalized[0]
-            return True, normalized
-    return False, value
+    return _normalize_scalar_or_range(value, is_number, min_value, max_value, min_included)
 
 
 def is_int_list_or_all(
