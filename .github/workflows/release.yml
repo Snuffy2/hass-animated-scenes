@@ -16,7 +16,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout trusted release tooling
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.workflow_sha }}
           path: release-tooling
@@ -25,7 +25,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Release events must package the release tag instead of a moving
           # target_commitish branch.
