@@ -71,6 +71,7 @@ from .const import (
     ERROR_BRIGHTNESS_NOT_INT_OR_RANGE,
     ERROR_COLORS_IS_BLANK,
     ERROR_COLORS_MALFORMED,
+    ERROR_FIELD_BASE,
     ERROR_SCENE_NAME_BLANK,
     ERROR_SCENE_NAME_EXISTS,
 )
@@ -117,6 +118,39 @@ def _scene_name_exists(hass: HomeAssistant, name: str, exclude_entry_id: str | N
         and entry.data.get(CONF_NAME) == name
         for entry in hass.config_entries.async_entries(DOMAIN)
     )
+
+
+def _validate_scene_step_data(
+    hass: HomeAssistant,
+    data: dict[str, Any],
+    defaults: dict[str, Any],
+    exclude_entry_id: str | None = None,
+) -> tuple[dict[str, Any], str | None]:
+    """Validate and normalize scene-step data shared by config and options flows.
+
+    Args:
+        hass: Home Assistant instance containing config entries.
+        data: Accumulated flow data including the submitted scene step input.
+        defaults: Values applied to any key still missing after validation.
+        exclude_entry_id: Entry id to ignore while checking for a duplicate name.
+
+    Returns:
+        The data with defaults filled and the first error key, or None when valid.
+
+    """
+    error: str | None = None
+    if not str(data[CONF_NAME]).strip():
+        error = ERROR_SCENE_NAME_BLANK
+    elif _scene_name_exists(hass, data[CONF_NAME], exclude_entry_id):
+        error = ERROR_SCENE_NAME_EXISTS
+    else:
+        try:
+            data = normalize_scene_input(data)
+        except vol.Invalid as err:
+            error = str(err)
+    for key, value in defaults.items():
+        data.setdefault(key, value)
+    return data, error
 
 
 def _validate_yaml_runtime_data(data: dict[str, Any]) -> None:
@@ -491,17 +525,9 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data.update(user_input)
             self._data.update({CONF_ENTITY_TYPE: ENTITY_SCENE})
-            if not str(self._data[CONF_NAME]).strip():
-                errors["base"] = ERROR_SCENE_NAME_BLANK
-            elif _scene_name_exists(self.hass, self._data[CONF_NAME]):
-                errors["base"] = ERROR_SCENE_NAME_EXISTS
-            else:
-                try:
-                    self._data = normalize_scene_input(self._data)
-                except vol.Invalid as err:
-                    errors["base"] = str(err)
-            for k, v in defaults.items():
-                self._data.setdefault(k, v)
+            self._data, error = _validate_scene_step_data(self.hass, self._data, defaults)
+            if error:
+                errors[ERROR_FIELD_BASE] = error
             if not errors:
                 if yaml_import:
                     self._data.update({CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_YAML})
@@ -536,9 +562,9 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data.update(user_input)
             if error := _validate_color_yaml_data(self._data):
-                errors["base"] = error
+                errors[ERROR_FIELD_BASE] = error
             if not errors and _scene_name_exists(self.hass, self._data[CONF_NAME]):
-                errors["base"] = ERROR_SCENE_NAME_EXISTS
+                errors[ERROR_FIELD_BASE] = ERROR_SCENE_NAME_EXISTS
             if not errors:
                 return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
         return self.async_show_form(
@@ -558,7 +584,7 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             if error := _normalize_rgb_ui_color_input(user_input):
-                errors["base"] = error
+                errors[ERROR_FIELD_BASE] = error
             if not errors:
                 color_uuid = uuid.random_uuid_hex()
                 color_rgb_dict = {
@@ -574,9 +600,9 @@ class AnimatedScenesConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_COLOR_RGB_DICT: clean_color_rgb_dict(color_rgb_dict),
                 }
                 if error := _validate_rgb_ui_runtime_data(candidate_data):
-                    errors["base"] = error
+                    errors[ERROR_FIELD_BASE] = error
                 elif _scene_name_exists(self.hass, self._data[CONF_NAME]):
-                    errors["base"] = ERROR_SCENE_NAME_EXISTS
+                    errors[ERROR_FIELD_BASE] = ERROR_SCENE_NAME_EXISTS
                 else:
                     self._data = candidate_data
                     return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
@@ -633,6 +659,23 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         ):
             await manager.stop_by_name(previous_name)
 
+    async def _async_save_and_reload(self) -> ConfigFlowResult:
+        """Persist the edited scene data, reload the entry, and finish the flow.
+
+        Returns:
+            The options-flow result that ends the flow without separate options.
+
+        """
+        await self._async_stop_previous_animation_if_renamed()
+        self.hass.config_entries.async_update_entry(
+            self.config,
+            data=self._data,
+            options=self.config.options,
+            title=self._data[CONF_NAME],
+        )
+        await self.hass.config_entries.async_reload(self.config.entry_id)
+        return self.async_create_entry(title="", data={})
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the options."""
         if self._data.get(CONF_ENTITY_TYPE, ENTITY_SCENE) == ENTITY_ACTIVITY_SENSOR:
@@ -653,17 +696,11 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             self._data.update(user_input)
             self._data.update({CONF_ENTITY_TYPE: ENTITY_SCENE})
-            if not str(self._data[CONF_NAME]).strip():
-                errors["base"] = ERROR_SCENE_NAME_BLANK
-            elif _scene_name_exists(self.hass, self._data[CONF_NAME], self.config.entry_id):
-                errors["base"] = ERROR_SCENE_NAME_EXISTS
-            else:
-                try:
-                    self._data = normalize_scene_input(self._data)
-                except vol.Invalid as err:
-                    errors["base"] = str(err)
-            for k, v in defaults.items():
-                self._data.setdefault(k, v)
+            self._data, error = _validate_scene_step_data(
+                self.hass, self._data, defaults, self.config.entry_id
+            )
+            if error:
+                errors[ERROR_FIELD_BASE] = error
             if not errors:
                 if (
                     self._data.get(CONF_COLOR_SELECTOR_MODE, COLOR_SELECTOR_RGB_UI)
@@ -696,22 +733,14 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             self._data.update(user_input)
             if error := _validate_color_yaml_data(self._data):
-                errors["base"] = error
+                errors[ERROR_FIELD_BASE] = error
             if not errors and _scene_name_exists(
                 self.hass, self._data[CONF_NAME], self.config.entry_id
             ):
-                errors["base"] = ERROR_SCENE_NAME_EXISTS
+                errors[ERROR_FIELD_BASE] = ERROR_SCENE_NAME_EXISTS
             if not errors:
                 self._data.update({CONF_COLOR_RGB_DICT: {}})
-                await self._async_stop_previous_animation_if_renamed()
-                self.hass.config_entries.async_update_entry(
-                    self.config,
-                    data=self._data,
-                    options=self.config.options,
-                    title=self._data[CONF_NAME],
-                )
-                await self.hass.config_entries.async_reload(self.config.entry_id)
-                return self.async_create_entry(title="", data={})
+                return await self._async_save_and_reload()
 
         return self.async_show_form(
             step_id="color_yaml",
@@ -736,7 +765,7 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             color_data.update(user_input)
             if error := _normalize_rgb_ui_color_input(color_data):
-                errors["base"] = error
+                errors[ERROR_FIELD_BASE] = error
             if not errors:
                 color_key = (
                     self._rgb_ui_color_keys[self._rgb_ui_color_index]
@@ -761,22 +790,14 @@ class AnimatedScenesOptionsFlowHandler(OptionsFlow):
                     CONF_COLOR_RGB_DICT: clean_color_rgb_dict(color_rgb_dict),
                 }
                 if not candidate_data[CONF_COLOR_RGB_DICT]:
-                    errors["base"] = ERROR_COLORS_IS_BLANK
+                    errors[ERROR_FIELD_BASE] = ERROR_COLORS_IS_BLANK
                 elif error := _validate_rgb_ui_runtime_data(candidate_data):
-                    errors["base"] = error
+                    errors[ERROR_FIELD_BASE] = error
                 elif _scene_name_exists(self.hass, self._data[CONF_NAME], self.config.entry_id):
-                    errors["base"] = ERROR_SCENE_NAME_EXISTS
+                    errors[ERROR_FIELD_BASE] = ERROR_SCENE_NAME_EXISTS
                 if not errors:
                     self._data = candidate_data
-                    await self._async_stop_previous_animation_if_renamed()
-                    self.hass.config_entries.async_update_entry(
-                        self.config,
-                        data=self._data,
-                        options=self.config.options,
-                        title=self._data[CONF_NAME],
-                    )
-                    await self.hass.config_entries.async_reload(self.config.entry_id)
-                    return self.async_create_entry(title="", data={})
+                    return await self._async_save_and_reload()
 
         return self.async_show_form(
             step_id="color_rgb_ui",
