@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from homeassistant.const import CONF_NAME
+from homeassistant.const import CONF_LIGHTS, CONF_NAME
 from homeassistant.core import HomeAssistant
 import pytest
 import voluptuous as vol
 
 from custom_components.animated_scenes import async_setup
 from custom_components.animated_scenes.animations import Animations
-from custom_components.animated_scenes.const import CONF_LIGHTS, DOMAIN
+from custom_components.animated_scenes.const import DOMAIN
 
 from .helpers import animation_tasks, register_light_services
 

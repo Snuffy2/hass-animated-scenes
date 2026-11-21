@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
-from types import MappingProxyType, SimpleNamespace
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
-from homeassistant.config_entries import ConfigEntry, DiscoveryKey
-from homeassistant.const import CONF_NAME, EVENT_HOMEASSISTANT_STOP
+from homeassistant.const import CONF_LIGHTS, CONF_NAME, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import IntegrationError
 from homeassistant.helpers import entity_registry as er
@@ -23,12 +22,7 @@ from homeassistant.util.color import (
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.animated_scenes import (
-    async_migrate_entry,
-    async_setup,
-    async_setup_entry,
-    async_unload_entry,
-)
+from custom_components.animated_scenes import async_setup
 from custom_components.animated_scenes.animations import (
     Animation,
     Animations,
@@ -36,15 +30,10 @@ from custom_components.animated_scenes.animations import (
     safe_call,
 )
 from custom_components.animated_scenes.const import (
-    COLOR_SELECTOR_YAML,
     CONF_ANIMATED_SCENE_SWITCH,
-    CONF_COLOR_RGB_DICT,
-    CONF_COLOR_SELECTOR_MODE,
     CONF_ENTITY_TYPE,
-    CONF_LIGHTS,
     CONF_SKIP_RESTORE,
     DOMAIN,
-    ENTITY_ACTIVITY_SENSOR,
     ENTITY_SCENE,
     EVENT_NAME_CHANGE,
     EVENT_STATE_UPDATED,
@@ -52,117 +41,21 @@ from custom_components.animated_scenes.const import (
     MIN_KELVIN,
 )
 
-from .helpers import animation_tasks, register_light_services
-
-DISCOVERY_KEYS: MappingProxyType[str, tuple[DiscoveryKey, ...]] = MappingProxyType({})
-LIGHT_ON: dict[str, object] = {"color_mode": "rgb", "brightness": 100, "rgb_color": (1, 2, 3)}
-
-
-def _animation_config(name: str, lights: list[str], priority: int = 0) -> dict[str, object]:
-    """Return a minimal validated runtime animation configuration.
-
-    Args:
-        name: Unique animation name used by the manager.
-        lights: Light entity ids controlled by the animation.
-        priority: Ownership priority used when animations overlap.
-
-    Returns:
-        A service-schema-compatible configuration dictionary for constructing
-        an ``Animation`` directly in manager unit tests.
-
-    """
-    return {
-        "name": name,
-        "lights": lights,
-        "colors": [{"color_type": "rgb_color", "color": (255, 0, 0)}],
-        "ignore_off": True,
-        "restore": True,
-        "restore_power": False,
-        "brightness": 255,
-        "transition": 1,
-        "change_frequency": 1,
-        "change_amount": "all",
-        "change_sequence": False,
-        "animate_brightness": True,
-        "animate_color": True,
-        "priority": priority,
-    }
-
-
-def _scene_entry() -> ConfigEntry:
-    """Return a scene config entry for unload lifecycle tests.
-
-    Returns:
-        A Home Assistant ``ConfigEntry`` carrying the minimal Animated Scenes
-        scene data needed by ``async_unload_entry``.
-
-    """
-    return ConfigEntry(
-        version=1,
-        minor_version=1,
-        domain=DOMAIN,
-        title="Spooky",
-        data={CONF_ENTITY_TYPE: ENTITY_SCENE, "name": "Spooky"},
-        discovery_keys=DISCOVERY_KEYS,
-        options={},
-        source="user",
-        subentries_data={},
-        unique_id=None,
-        entry_id="entry-spooky",
-    )
-
-
-def _runtime_manager(hass: HomeAssistant) -> Animations:
-    """Return a runtime manager registered as the active singleton."""
-    manager = Animations(hass)
-    Animations.instance = manager
-    return manager
-
-
-async def _start(
-    manager: Animations, name: str, lights: list[str], **overrides: object
-) -> Animation:
-    """Start a scene whose loop stays idle and return its running animation.
-
-    Args:
-        manager: Runtime manager that starts the scene.
-        name: Scene name.
-        lights: Lights controlled by the scene.
-        **overrides: Scene configuration values to override.
-
-    Returns:
-        The animation registered by the public manager start path.
-
-    """
-    await manager.start({**_animation_config(name, lights), "change_frequency": 3600, **overrides})
-    await asyncio.sleep(0)
-    return manager.animations[name]
+from .helpers import (
+    LIGHT_ON,
+    animation_config,
+    animation_tasks,
+    full_scene_data,
+    register_light_services,
+    runtime_manager,
+    setup_scene_entry,
+    start_scene,
+)
 
 
 def _repeating_config(name: str, lights: list[str]) -> dict[str, Any]:
     """Return a scene configuration whose loop stays idle during a test."""
-    return {**_animation_config(name, lights), "change_frequency": 3600}
-
-
-def _full_scene_data(name: str = "Spooky") -> dict[str, object]:
-    """Return stored data for a real scene config entry."""
-    return {
-        **_animation_config(name, ["light.one"]),
-        "colors": [{"color_type": "rgb_color", "color": [255, 0, 0]}],
-        "change_frequency": 3600,
-        "icon": "mdi:lightbulb",
-        CONF_COLOR_SELECTOR_MODE: COLOR_SELECTOR_YAML,
-        CONF_COLOR_RGB_DICT: {},
-    }
-
-
-async def _setup_scene_entry(hass: HomeAssistant, data: dict[str, object]) -> MockConfigEntry:
-    """Set up a real scene config entry and return it."""
-    entry = MockConfigEntry(domain=DOMAIN, version=1, title=str(data[CONF_NAME]), data=data)
-    entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-    return entry
+    return {**animation_config(name, lights), "change_frequency": 3600}
 
 
 @pytest.mark.parametrize("kelvin", [2200, 4000, 6200])
@@ -178,11 +71,11 @@ def test_kelvin_rgb_round_trip_stays_near_source(kelvin: int) -> None:
 
 def test_repeating_animation_frequency_is_never_zero(hass: HomeAssistant) -> None:
     """Keep every accepted repeating frequency above zero at runtime."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     hass.states.async_set("light.one", "on")
 
     for change_frequency in (0.1, [0.1, 0.2]):
-        config = _animation_config("Repeating", ["light.one"])
+        config = animation_config("Repeating", ["light.one"])
         config["change_frequency"] = change_frequency
         animation = Animation(hass, manager.validate_start(config))
 
@@ -217,11 +110,11 @@ async def test_safe_call_propagates_unexpected_runtime_errors() -> None:
 
 async def test_add_lights_updates_running_animation(hass: HomeAssistant) -> None:
     """Track added lights once and notify event-driven entities."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     register_light_services(hass)
     for light in ("light.one", "light.two"):
         hass.states.async_set(light, "on", LIGHT_ON)
-    animation = await _start(manager, "Spooky", ["light.one"])
+    animation = await start_scene(manager, "Spooky", ["light.one"])
     events: list[Mapping[str, Any]] = []
     hass.bus.async_listen(EVENT_NAME_CHANGE, lambda event: events.append(event.data))
 
@@ -249,7 +142,7 @@ async def test_add_lights_to_animation_rejects_invalid_switch(
     hass: HomeAssistant, registry_args: tuple[str, str, str] | None, message: str
 ) -> None:
     """Raise a clean integration error for switches outside this integration."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     entity_id = "switch.missing"
     if registry_args is not None:
         entity_id = er.async_get(hass).async_get_or_create(*registry_args).entity_id
@@ -264,11 +157,11 @@ async def test_add_lights_to_animation_resolves_renamed_switch_by_config_entry(
     hass: HomeAssistant,
 ) -> None:
     """Resolve a scene through stable registry identity after a display-name change."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     register_light_services(hass)
     for light in ("light.one", "light.two"):
         hass.states.async_set(light, "on", LIGHT_ON)
-    animation = await _start(manager, "Spooky", ["light.one"])
+    animation = await start_scene(manager, "Spooky", ["light.one"])
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_ENTITY_TYPE: ENTITY_SCENE, CONF_NAME: "Spooky"},
@@ -296,11 +189,11 @@ async def test_add_lights_to_animation_resolves_renamed_switch_by_config_entry(
 
 async def test_add_lights_tracks_only_lights_that_become_active(hass: HomeAssistant) -> None:
     """Exclude missing and ignored-off additions from light ownership."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
     hass.states.async_set("light.off", "off")
-    animation = await _start(manager, "Spooky", ["light.one"], ignore_off=False)
+    animation = await start_scene(manager, "Spooky", ["light.one"], ignore_off=False)
     new_lights = {CONF_NAME: "Spooky", CONF_LIGHTS: ["light.missing", "light.off"]}
 
     await manager.add_lights_to_animation(new_lights)
@@ -324,10 +217,10 @@ async def test_remove_final_light_honors_restore_and_stops_animation(
     hass: HomeAssistant, skip_restore: bool, expected_colors: list[tuple[int, int, int]]
 ) -> None:
     """Restore as requested, notify listeners, and stop an emptied animation."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
-    animation = await _start(manager, "Spooky", ["light.one"])
+    animation = await start_scene(manager, "Spooky", ["light.one"])
     await hass.async_block_till_done()
     calls.clear()
     events: list[Mapping[str, Any]] = []
@@ -347,12 +240,12 @@ async def test_remove_lights_removes_overlapping_light_from_every_animation(
     hass: HomeAssistant,
 ) -> None:
     """Remove an overlapping light from all priorities and future updates."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     for light in ("light.one", "light.low", "light.high"):
         hass.states.async_set(light, "on", LIGHT_ON)
-    low = await _start(manager, "Low", ["light.one", "light.low"], priority=1)
-    high = await _start(manager, "High", ["light.one", "light.high"], priority=10)
+    low = await start_scene(manager, "Low", ["light.one", "light.low"], priority=1)
+    high = await start_scene(manager, "High", ["light.one", "light.high"], priority=10)
 
     await manager.remove_lights({CONF_LIGHTS: ["light.one"], CONF_SKIP_RESTORE: True})
     await hass.async_block_till_done()
@@ -371,10 +264,10 @@ async def test_remove_lights_removes_overlapping_light_from_every_animation(
 
 async def test_removed_light_is_not_reanimated_by_its_restore(hass: HomeAssistant) -> None:
     """Ignore the off-to-on event produced by restoring a removed light."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
-    animation = await _start(manager, "Spooky", ["light.one"])
+    animation = await start_scene(manager, "Spooky", ["light.one"])
     hass.states.async_set("light.one", "off", LIGHT_ON)
     await hass.async_block_till_done()
     calls.clear()
@@ -390,11 +283,11 @@ async def test_removed_light_is_not_reanimated_by_its_restore(hass: HomeAssistan
 
 async def test_start_clamps_oversized_change_amount(hass: HomeAssistant) -> None:
     """Normalize service change_amount before the animation loop can sample lights."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
 
-    animation = await _start(manager, "Spooky", ["light.one"], change_amount=2)
+    animation = await start_scene(manager, "Spooky", ["light.one"], change_amount=2)
 
     assert animation.get_change_amount() == 1
     await manager.stop({CONF_NAME: "Spooky"})
@@ -409,12 +302,12 @@ async def test_one_shot_release_honors_restore_setting(
     hass: HomeAssistant, restore: bool, expected_colors: list[tuple[int, int, int]]
 ) -> None:
     """Apply one update and restore only when configured to do so."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
 
     await manager.start(
-        {**_animation_config("One Shot", ["light.one"]), "change_frequency": 0, "restore": restore}
+        {**animation_config("One Shot", ["light.one"]), "change_frequency": 0, "restore": restore}
     )
     await hass.async_block_till_done()
 
@@ -424,18 +317,18 @@ async def test_one_shot_release_honors_restore_setting(
 
 async def test_start_tracks_only_active_lights_across_restart(hass: HomeAssistant) -> None:
     """Avoid ownership for missing and ignored-off configured lights."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     register_light_services(hass)
     hass.states.async_set("light.active", "on", LIGHT_ON)
     hass.states.async_set("light.off", "off")
     lights = ["light.active", "light.off", "light.missing"]
 
-    await _start(manager, "Spooky", list(lights), ignore_off=False)
+    await start_scene(manager, "Spooky", list(lights), ignore_off=False)
     assert set(manager.light_owner) == {"light.active"}
 
     await manager.stop({CONF_NAME: "Spooky"})
     hass.states.async_set("light.off", "on", LIGHT_ON)
-    await _start(manager, "Spooky", list(lights), ignore_off=False)
+    await start_scene(manager, "Spooky", list(lights), ignore_off=False)
 
     assert set(manager.light_owner) == {"light.active", "light.off"}
     await manager.stop({CONF_NAME: "Spooky"})
@@ -443,7 +336,7 @@ async def test_start_tracks_only_active_lights_across_restart(hass: HomeAssistan
 
 async def test_startup_failure_rolls_back_runtime_state(hass: HomeAssistant) -> None:
     """Stop tracking a light when initial startup fails."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
 
@@ -451,7 +344,7 @@ async def test_startup_failure_rolls_back_runtime_state(hass: HomeAssistant) -> 
         patch.object(Animation, "start", AsyncMock(side_effect=RuntimeError("startup failed"))),
         pytest.raises(RuntimeError, match="startup failed"),
     ):
-        await manager.start(_animation_config("Spooky", ["light.one"]))
+        await manager.start(animation_config("Spooky", ["light.one"]))
     await hass.async_block_till_done()
     calls.clear()
 
@@ -467,11 +360,11 @@ async def test_startup_failure_rolls_back_runtime_state(hass: HomeAssistant) -> 
 
 async def test_update_skips_light_removed_after_tick_selection(hass: HomeAssistant) -> None:
     """Tolerate ownership removal after a tick selects its lights."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     for light in ("light.one", "light.two"):
         hass.states.async_set(light, "on", LIGHT_ON)
-    animation = await _start(manager, "Spooky", ["light.one", "light.two"])
+    animation = await start_scene(manager, "Spooky", ["light.one", "light.two"])
     await hass.async_block_till_done()
     calls.clear()
     selected_update_started = asyncio.Event()
@@ -503,7 +396,7 @@ async def test_concurrent_same_name_start_replaces_only_after_startup(
     hass: HomeAssistant,
 ) -> None:
     """Serialize same-name starts and keep stale cleanup from removing the replacement."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
     initial_update_started = asyncio.Event()
     continue_initial_update = asyncio.Event()
@@ -518,12 +411,10 @@ async def test_concurrent_same_name_start_replaces_only_after_startup(
             await continue_initial_update.wait()
 
     with patch("custom_components.animated_scenes.animations.safe_call", pause_first_update):
-        first_start = asyncio.create_task(manager.start(_animation_config("Spooky", ["light.one"])))
+        first_start = asyncio.create_task(manager.start(animation_config("Spooky", ["light.one"])))
         await initial_update_started.wait()
         original = manager.animations["Spooky"]
-        second_start = asyncio.create_task(
-            manager.start(_animation_config("Spooky", ["light.one"]))
-        )
+        second_start = asyncio.create_task(manager.start(animation_config("Spooky", ["light.one"])))
         await asyncio.sleep(0)
 
         assert not second_start.done()
@@ -545,7 +436,7 @@ async def test_remove_final_light_waits_for_startup_and_leaves_no_empty_task(
     hass: HomeAssistant,
 ) -> None:
     """Serialize final-light removal until startup can create and stop its task."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
     initial_update_started = asyncio.Event()
     continue_initial_update = asyncio.Event()
@@ -556,7 +447,7 @@ async def test_remove_final_light_waits_for_startup_and_leaves_no_empty_task(
         await continue_initial_update.wait()
 
     with patch("custom_components.animated_scenes.animations.safe_call", pause_initial_update):
-        start_task = asyncio.create_task(manager.start(_animation_config("Spooky", ["light.one"])))
+        start_task = asyncio.create_task(manager.start(animation_config("Spooky", ["light.one"])))
         await initial_update_started.wait()
         animation = manager.animations["Spooky"]
         remove_task = asyncio.create_task(
@@ -578,11 +469,11 @@ async def test_update_lights_clamps_change_amount_to_active_lights(
     hass: HomeAssistant,
 ) -> None:
     """Clamp runtime sampling after the active light set changes."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     for light in ("light.one", "light.two"):
         hass.states.async_set(light, "on", LIGHT_ON)
-    animation = await _start(manager, "Spooky", ["light.one", "light.two"], change_amount=2)
+    animation = await start_scene(manager, "Spooky", ["light.one", "light.two"], change_amount=2)
     await manager.remove_lights({CONF_LIGHTS: ["light.two"], CONF_SKIP_RESTORE: True})
     await hass.async_block_till_done()
     calls.clear()
@@ -610,7 +501,7 @@ async def test_start_service_accepts_text_change_amount(
         DOMAIN,
         "start_animation",
         {
-            **_animation_config("Spooky", ["light.one"]),
+            **animation_config("Spooky", ["light.one"]),
             "change_amount": change_amount,
         },
         blocking=True,
@@ -631,8 +522,8 @@ def test_validate_start_converts_normalization_errors_to_integration_error(
     hass: HomeAssistant, invalid_data: dict[str, object]
 ) -> None:
     """Report malformed service data with IntegrationError instead of raw exceptions."""
-    manager = _runtime_manager(hass)
-    data = _animation_config("Spooky", ["light.one"])
+    manager = runtime_manager(hass)
+    data = animation_config("Spooky", ["light.one"])
     data.update(invalid_data)
 
     with pytest.raises(IntegrationError, match="Service data did not match schema"):
@@ -641,10 +532,10 @@ def test_validate_start_converts_normalization_errors_to_integration_error(
 
 async def test_stop_by_name_ends_task_and_clears_runtime(hass: HomeAssistant) -> None:
     """Stop the loop and release a named animation without service validation."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
-    await _start(manager, "Spooky", ["light.one"])
+    await start_scene(manager, "Spooky", ["light.one"])
     assert len(animation_tasks("Spooky")) == 1
 
     await manager.stop_by_name("Spooky")
@@ -655,97 +546,11 @@ async def test_stop_by_name_ends_task_and_clears_runtime(hass: HomeAssistant) ->
     assert manager.light_owner == {}
 
 
-async def test_unload_stops_running_scene_and_keeps_services(hass: HomeAssistant) -> None:
-    """Stop a scene on real entry unload while keeping public services available."""
-    register_light_services(hass)
-    hass.states.async_set("light.one", "on", LIGHT_ON)
-    entry = await _setup_scene_entry(hass, _full_scene_data())
-    manager = Animations.instance
-    assert manager is not None
-    await hass.services.async_call(
-        "switch", "turn_on", {"entity_id": "switch.animated_scenes_spooky"}, blocking=True
-    )
-    await asyncio.sleep(0)
-    assert len(animation_tasks("Spooky")) == 1
-
-    assert await hass.config_entries.async_unload(entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert animation_tasks("Spooky") == []
-    assert manager.animations == {}
-    assert Animations.instance is manager
-
-    await hass.services.async_call(
-        DOMAIN,
-        "start_animation",
-        {**_animation_config("Manual", ["light.one"]), "change_frequency": 3600},
-        blocking=True,
-    )
-    assert "Manual" in manager.animations
-    await manager.stop({CONF_NAME: "Manual"})
-
-
-async def test_setup_entry_recreates_manager_after_last_entry_unload(
-    hass: HomeAssistant,
-) -> None:
-    """Recreate the runtime manager when a reload sets up the entry again."""
-    Animations.instance = None
-    entry = _scene_entry()
-    with patch.object(hass.config_entries, "async_forward_entry_setups", AsyncMock()):
-        assert await async_setup_entry(hass, entry) is True
-
-    assert Animations.instance is not None
-
-
-@pytest.mark.parametrize(
-    ("data", "expected_type"),
-    [
-        ({CONF_NAME: "Legacy"}, ENTITY_SCENE),
-        (
-            {CONF_NAME: "Activity Sensor", CONF_ENTITY_TYPE: ENTITY_ACTIVITY_SENSOR},
-            ENTITY_ACTIVITY_SENSOR,
-        ),
-    ],
-)
-async def test_migrate_entry_persists_entity_type(
-    hass: HomeAssistant, data: dict[str, str], expected_type: str
-) -> None:
-    """Default legacy scenes while preserving explicit activity sensors."""
-    entry = MockConfigEntry(domain=DOMAIN, data=data, version=1)
-    entry.add_to_hass(hass)
-
-    assert await async_migrate_entry(hass, entry) is True
-
-    assert entry.version == 2
-    assert entry.data[CONF_ENTITY_TYPE] == expected_type
-
-
-async def test_legacy_scene_migrates_runs_and_unloads(hass: HomeAssistant) -> None:
-    """Run a legacy scene without a persisted entity type through its switch."""
-    register_light_services(hass)
-    hass.states.async_set("light.one", "on", LIGHT_ON)
-    entry = await _setup_scene_entry(hass, _full_scene_data("Legacy"))
-    manager = Animations.instance
-    assert manager is not None
-
-    assert entry.version == 2
-    assert entry.data[CONF_ENTITY_TYPE] == ENTITY_SCENE
-    await hass.services.async_call(
-        "switch", "turn_on", {"entity_id": "switch.animated_scenes_legacy"}, blocking=True
-    )
-    assert "Legacy" in manager.animations
-
-    assert await hass.config_entries.async_unload(entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert manager.animations == {}
-
-
 async def test_stored_zero_start_frequency_range_still_runs(hass: HomeAssistant) -> None:
     """Keep an upgraded scene with a zero-start range running from its switch."""
     register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
-    await _setup_scene_entry(hass, {**_full_scene_data(), "change_frequency": [0, 5]})
+    await setup_scene_entry(hass, {**full_scene_data(), "change_frequency": [0, 5]})
     manager = Animations.instance
     assert manager is not None
 
@@ -755,24 +560,6 @@ async def test_stored_zero_start_frequency_range_still_runs(hass: HomeAssistant)
 
     animation = manager.animations["Spooky"]
     assert all(0.1 <= animation.get_change_frequency() <= 5 for _ in range(50))
-    await manager.stop({CONF_NAME: "Spooky"})
-
-
-async def test_unload_keeps_animation_when_platform_unload_fails(
-    hass: HomeAssistant,
-) -> None:
-    """Keep the scene running when Home Assistant cannot unload its platform."""
-    manager = _runtime_manager(hass)
-    register_light_services(hass)
-    hass.states.async_set("light.one", "on", LIGHT_ON)
-    await _start(manager, "Spooky", ["light.one"])
-    entry = _scene_entry()
-
-    with patch.object(hass.config_entries, "async_unload_platforms", return_value=False):
-        assert await async_unload_entry(hass, entry) is False
-
-    assert len(animation_tasks("Spooky")) == 1
-    assert "Spooky" in manager.animations
     await manager.stop({CONF_NAME: "Spooky"})
 
 
@@ -812,7 +599,7 @@ async def test_stop_restores_each_color_mode_and_allows_restart(
     hass: HomeAssistant, attributes: dict[str, Any], expected: dict[str, Any]
 ) -> None:
     """Restore through the real light schema and leave the scene startable."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", attributes)
     await manager.start(_repeating_config("Spooky", ["light.one"]))
@@ -834,7 +621,7 @@ async def test_stop_restores_each_color_mode_and_allows_restart(
 
 async def test_restart_keeps_original_state_for_final_restore(hass: HomeAssistant) -> None:
     """Restore the pre-animation color after a same-name restart."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set(
         "light.one", "on", {"color_mode": "rgb", "brightness": 9, "rgb_color": (1, 2, 3)}
@@ -861,7 +648,7 @@ async def test_restart_keeps_original_state_for_final_restore(hass: HomeAssistan
 
 async def test_home_assistant_stop_ends_running_animations(hass: HomeAssistant) -> None:
     """Stop animation loops and release lights when Home Assistant stops."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     register_light_services(hass)
     hass.states.async_set("light.one", "on", {"color_mode": "rgb", "rgb_color": (1, 2, 3)})
     await manager.start(_repeating_config("Spooky", ["light.one"]))
@@ -878,7 +665,7 @@ async def test_home_assistant_stop_ends_running_animations(hass: HomeAssistant) 
 
 async def test_stop_before_first_loop_step_releases_lights(hass: HomeAssistant) -> None:
     """Release lights when a task is cancelled before its first step."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     register_light_services(hass)
     hass.states.async_set("light.one", "on", {"color_mode": "rgb", "rgb_color": (1, 2, 3)})
     await manager.start(_repeating_config("Spooky", ["light.one"]))
@@ -899,10 +686,10 @@ async def test_priority_handoff_applies_color_then_restores_original(
     hass: HomeAssistant, low_priority: int, high_priority: int
 ) -> None:
     """Hand a light to the next priority and restore it after the final owner."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
-    low = await _start(
+    low = await start_scene(
         manager,
         "Low",
         ["light.one"],
@@ -910,7 +697,7 @@ async def test_priority_handoff_applies_color_then_restores_original(
         animate_color=False,
         colors=[{"color_type": "rgb_color", "color": (0, 255, 0)}],
     )
-    await _start(manager, "High", ["light.one"], priority=high_priority)
+    await start_scene(manager, "High", ["light.one"], priority=high_priority)
     calls.clear()
 
     await manager.stop({CONF_NAME: "High"})
@@ -931,10 +718,10 @@ async def test_priority_handoff_applies_color_despite_one_change_per_tick(
     hass: HomeAssistant,
 ) -> None:
     """Send the returning scene's color on handoff even if a tick would change brightness only."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
-    await _start(
+    await start_scene(
         manager,
         "Low",
         ["light.one"],
@@ -949,7 +736,7 @@ async def test_priority_handoff_applies_color_despite_one_change_per_tick(
             }
         ],
     )
-    await _start(manager, "High", ["light.one"], priority=10)
+    await start_scene(manager, "High", ["light.one"], priority=10)
     calls.clear()
 
     with patch("custom_components.animated_scenes.animations.randrange", return_value=2):
@@ -962,7 +749,7 @@ async def test_priority_handoff_applies_color_despite_one_change_per_tick(
 
 async def test_external_turn_on_updates_light_from_event_loop(hass: HomeAssistant) -> None:
     """Re-apply the animation when a tracked light is turned back on."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", {"color_mode": "rgb", "rgb_color": (1, 2, 3)})
     await manager.start(_repeating_config("Spooky", ["light.one"]))
@@ -981,17 +768,17 @@ async def test_external_turn_on_updates_light_from_event_loop(hass: HomeAssistan
 
 async def test_external_turn_on_reapplies_only_the_recorded_owner(hass: HomeAssistant) -> None:
     """Send one update from the owner when equal-priority scenes share a light."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
-    await _start(
+    await start_scene(
         manager,
         "First",
         ["light.one"],
         priority=5,
         colors=[{"color_type": "rgb_color", "color": (255, 0, 0)}],
     )
-    second = await _start(
+    second = await start_scene(
         manager,
         "Second",
         ["light.one"],
@@ -1018,14 +805,14 @@ async def test_sequence_scene_with_zero_weights_starts_from_switch(hass: HomeAss
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
     data = {
-        **_full_scene_data(),
+        **full_scene_data(),
         "change_sequence": True,
         "colors": [
             {"color_type": "rgb_color", "color": [255, 0, 0], "weight": 0},
             {"color_type": "rgb_color", "color": [0, 0, 255], "weight": 0},
         ],
     }
-    await _setup_scene_entry(hass, data)
+    await setup_scene_entry(hass, data)
     manager = Animations.instance
     assert manager is not None
 
@@ -1044,10 +831,10 @@ async def test_random_scene_with_zero_weights_is_rejected_by_switch(hass: HomeAs
     register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
     data = {
-        **_full_scene_data(),
+        **full_scene_data(),
         "colors": [{"color_type": "rgb_color", "color": [255, 0, 0], "weight": 0}],
     }
-    await _setup_scene_entry(hass, data)
+    await setup_scene_entry(hass, data)
     manager = Animations.instance
     assert manager is not None
 
@@ -1088,7 +875,7 @@ async def test_nearby_color_sends_valid_nearby_value(
     hass: HomeAssistant, color_type: str, value: Any
 ) -> None:
     """Send a nearby color in its original format through the light schema."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
 
@@ -1096,7 +883,7 @@ async def test_nearby_color_sends_valid_nearby_value(
         "custom_components.animated_scenes.animations.uniform",
         side_effect=lambda low, _high: low,
     ):
-        await _start(
+        await start_scene(
             manager,
             "Spooky",
             ["light.one"],
@@ -1120,11 +907,11 @@ async def test_mired_colors_are_sent_as_bounded_kelvin(
     hass: HomeAssistant, mireds: int, expected_kelvin: int
 ) -> None:
     """Convert legacy mired colors to the Kelvin field Home Assistant accepts."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
 
-    await _start(
+    await start_scene(
         manager,
         "Spooky",
         ["light.one"],
@@ -1138,11 +925,11 @@ async def test_mired_colors_are_sent_as_bounded_kelvin(
 
 async def test_starting_off_light_sends_one_initial_update(hass: HomeAssistant) -> None:
     """Do not treat the scene's own turn-on as an external light change."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "off")
 
-    await _start(manager, "Spooky", ["light.one"])
+    await start_scene(manager, "Spooky", ["light.one"])
     await hass.async_block_till_done()
 
     assert len(calls) == 2  # Initial update plus the loop's first tick.
@@ -1153,11 +940,11 @@ async def test_oversized_change_amount_applies_to_lights_added_later(
     hass: HomeAssistant,
 ) -> None:
     """Use the configured amount once enough active lights exist."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     register_light_services(hass)
     for light in ("light.one", "light.two", "light.three"):
         hass.states.async_set(light, "on", LIGHT_ON)
-    animation = await _start(manager, "Spooky", ["light.one"], change_amount=2)
+    animation = await start_scene(manager, "Spooky", ["light.one"], change_amount=2)
     assert animation.get_change_amount() == 1
 
     await manager.add_lights_to_animation(
@@ -1184,7 +971,7 @@ async def test_add_lights_rejects_invalid_targets(
     hass: HomeAssistant, data: dict[str, str], message: str
 ) -> None:
     """Report invalid animation targets with a clear integration error."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
 
     with pytest.raises(IntegrationError, match=message):
         await manager.add_lights_to_animation({**data, CONF_LIGHTS: ["light.one"]})
@@ -1194,11 +981,11 @@ async def test_static_brightness_applies_when_brightness_is_not_animated(
     hass: HomeAssistant,
 ) -> None:
     """Use the documented top-level brightness when animation is disabled."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
 
-    await _start(manager, "Spooky", ["light.one"], animate_brightness=False, brightness=50)
+    await start_scene(manager, "Spooky", ["light.one"], animate_brightness=False, brightness=50)
     await hass.async_block_till_done()
 
     assert calls[0]["brightness"] == 50
@@ -1207,10 +994,10 @@ async def test_static_brightness_applies_when_brightness_is_not_animated(
 
 async def test_same_priority_restart_does_not_flash_lower_scene(hass: HomeAssistant) -> None:
     """Keep ownership through a same-priority restart without a lower-scene flash."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
-    await _start(
+    await start_scene(
         manager,
         "Low",
         ["light.one"],
@@ -1218,10 +1005,10 @@ async def test_same_priority_restart_does_not_flash_lower_scene(hass: HomeAssist
         animate_color=False,
         colors=[{"color_type": "rgb_color", "color": (0, 255, 0)}],
     )
-    await _start(manager, "High", ["light.one"], priority=10)
+    await start_scene(manager, "High", ["light.one"], priority=10)
     calls.clear()
 
-    restarted = await _start(manager, "High", ["light.one"], priority=10)
+    restarted = await start_scene(manager, "High", ["light.one"], priority=10)
     await hass.async_block_till_done()
 
     assert (0, 255, 0) not in [call.get("rgb_color") for call in calls]
@@ -1232,10 +1019,10 @@ async def test_same_priority_restart_does_not_flash_lower_scene(hass: HomeAssist
 
 async def test_lowered_priority_restart_hands_off_to_other_scene(hass: HomeAssistant) -> None:
     """Hand a light to the other scene when a restart drops below its priority."""
-    manager = _runtime_manager(hass)
+    manager = runtime_manager(hass)
     calls = register_light_services(hass)
     hass.states.async_set("light.one", "on", LIGHT_ON)
-    other = await _start(
+    other = await start_scene(
         manager,
         "Other",
         ["light.one"],
@@ -1243,10 +1030,10 @@ async def test_lowered_priority_restart_hands_off_to_other_scene(hass: HomeAssis
         animate_color=False,
         colors=[{"color_type": "rgb_color", "color": (0, 255, 0)}],
     )
-    await _start(manager, "High", ["light.one"], priority=10)
+    await start_scene(manager, "High", ["light.one"], priority=10)
     calls.clear()
 
-    await _start(manager, "High", ["light.one"], priority=1)
+    await start_scene(manager, "High", ["light.one"], priority=1)
     await hass.async_block_till_done()
 
     assert (0, 255, 0) in [call.get("rgb_color") for call in calls]
